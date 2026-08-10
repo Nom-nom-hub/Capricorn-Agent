@@ -34,3 +34,15 @@ The mark combines symmetrical horns, an ascending tail, and four constellation p
 - Environment prefix for new public settings: `CAPRICORN_`
 
 Legacy Prime Agent identifiers may remain as compatibility aliases or internal protocol names. Prime Intellect and Prime Inference retain their names when referring to those optional services.
+
+## Summit UI
+
+Capricorn's terminal experience is structured as an expedition workspace rather than a generic chat shell:
+
+- **Basecamp** is the workspace and expedition roster.
+- **Expedition** is one durable working conversation.
+- **Mission** is the persistent objective.
+- **Crew** describes delegated workers as a group; technical surfaces may still say subagent.
+- **Trail Bar** is the persistent navigation and workspace dock.
+
+The shell uses a compact operational masthead, a mission-aware prompt deck, and a persistent command dock. Gold marks identity and primary focus; teal marks navigation and information; semantic states always include text rather than relying on color. Layouts must remain readable at 40, 80, and 120 columns, progressively removing secondary metadata before actions or status.

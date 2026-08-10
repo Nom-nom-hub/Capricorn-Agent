@@ -1,4 +1,5 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
+import stripAnsi from "strip-ansi";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provider.js";
 import { FooterComponent } from "../src/modes/interactive/components/footer.js";
@@ -28,6 +29,8 @@ describe("FooterComponent width handling", () => {
 		const footer = new FooterComponent(createFooterData(1));
 
 		const lines = footer.render(width);
+		expect(stripAnsi(lines.join("\n"))).toContain("CAPRICORN");
+		expect(stripAnsi(lines.join("\n"))).toContain("/mission");
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBeLessThanOrEqual(width);
 		}

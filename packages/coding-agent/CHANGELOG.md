@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Changed the terminal shell to Summit UI with an Expedition top bar, compact operational masthead, mission-aware prompt deck, branded prompt marker, and persistent Trail Bar.
 - Added `/mission`, a Capricorn Mission Control panel for goal, workspace, run, subagent, and deterministic next-action status.
 - Changed the startup splash to use Capricorn gold with the product name and tagline.
 - Changed the public product identity to Capricorn, including the CLI, isolated state directory, gold theme and mark, source documentation, opt-in release channel, and telemetry-off default.

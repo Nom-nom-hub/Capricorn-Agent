@@ -178,6 +178,7 @@ import { BashExecutionComponent } from "./components/bash-execution.js";
 import { BorderedLoader } from "./components/bordered-loader.js";
 import { BranchSummaryMessageComponent } from "./components/branch-summary-message.js";
 import { CapricornOnboardingSplashComponent } from "./components/capricorn-onboarding-splash.js";
+import { CapricornTopBar, formatExpeditionDockHeader } from "./components/capricorn-shell.js";
 import { type FullPaneOverlayOptions, showFullPaneOverlay } from "./components/centered-overlay.js";
 import {
 	CompactionOutcomeMessageComponent,
@@ -215,6 +216,7 @@ import {
 } from "./components/slash-command-message.js";
 import { SlashCommandResultMessageComponent } from "./components/slash-command-result-message.js";
 import { countDirectSubagentStatuses, SubagentSummaryLine } from "./components/subagent-summary-line.js";
+import { SummitHeader } from "./components/summit-header.js";
 import { ThinkingSelectorComponent } from "./components/thinking-selector.js";
 import {
 	selectLatestToolExpandHint,
@@ -1021,6 +1023,10 @@ export class InteractiveMode {
 	// Custom footer from extension (undefined = use built-in footer)
 	private customFooter: (Component & { dispose?(): void }) | undefined = undefined;
 
+	// Capricorn shell bar remains separate from extension-replaceable headers.
+	private shellTopBarContainer: Container;
+	private shellTopBar: CapricornTopBar;
+
 	// Header container that holds the built-in or custom header
 	private headerContainer: Container;
 
@@ -1072,6 +1078,7 @@ export class InteractiveMode {
 		this.ui.onCopy = (text) => {
 			void this.copyFullscreenSelection(text);
 		};
+		this.shellTopBarContainer = new Container();
 		this.headerContainer = new Container();
 		this.chatContainer = new Container();
 		this.shortcutGuideContainer = new Container();
@@ -1091,9 +1098,11 @@ export class InteractiveMode {
 			paddingX: editorPaddingX,
 			autocompleteMaxVisible,
 			isArgumentCommand: builtinSlashCommandTakesArgument,
-			placeholder: this.startHint,
+			promptPrefix: "› ",
+			placeholder: `${this.startHint}  ·  / commands  ·  ? shortcuts`,
 			placeholderColor: (text) => theme.fg("dim", text),
 		});
+		this.defaultEditor.getHeaderLine = () => formatExpeditionDockHeader(this.connectionState?.goal);
 		this.editor = this.defaultEditor;
 		this.mainContainer = new Container();
 		this.mainViewContainer = new Container();
@@ -1115,6 +1124,16 @@ export class InteractiveMode {
 		this.subagentSummaryLine.onCancel = () => this.focusEditor();
 		this.subagentSummaryLine.onChatAction = (data) => this.handleSubagentSummaryChatAction(data);
 		this.footerDataProvider = new FooterDataProvider(this.uiServices.getInitialCwd());
+		this.shellTopBar = new CapricornTopBar(() => ({
+			sessionName: this.getCurrentSessionName(),
+			cwd: this.getCurrentCwd(),
+			model: this.getCurrentModelId(),
+			thinkingLevel: this.connectionState?.thinkingLevel,
+			isStreaming: this.connectionState?.isStreaming ?? false,
+			isCompacting: this.connectionState?.isCompacting ?? false,
+			isBashRunning: this.connectionState?.isBashRunning ?? false,
+		}));
+		this.shellTopBarContainer.addChild(this.shellTopBar);
 		this.footer = new FooterComponent(this.footerDataProvider);
 		this.footer.setAutoCompactEnabled(this.settingsManager.getCompactionEnabled());
 		this.setGoalAnnouncementBaseline(emptyGoalState());
@@ -1353,7 +1372,8 @@ export class InteractiveMode {
 			this.showWarning(formatMissingRipgrepMessage(rgResult));
 		}
 
-		// Add header container as first child
+		// Summit shell identity remains visible independently of custom headers.
+		this.ui.addChild(this.shellTopBarContainer);
 		this.ui.addChild(this.headerContainer);
 
 		// Brand splash: side-panel layout with structured runtime metadata on the right.
@@ -1385,11 +1405,10 @@ export class InteractiveMode {
 						rawKeyHint("drop files", "to attach"),
 					].join("\n")
 				: undefined;
-			this.builtInHeader = new BrandSplashHeader(
+			this.builtInHeader = new SummitHeader(
 				this.version,
 				() => this.getCurrentModelId(),
 				() => this.getCurrentCwd(),
-				verboseInstructions,
 				{
 					topPadding: true,
 					getHideStartHint: () => !this.isNewChat(),
@@ -1397,6 +1416,10 @@ export class InteractiveMode {
 				},
 			);
 			this.headerContainer.addChild(this.builtInHeader);
+			if (verboseInstructions) {
+				this.headerContainer.addChild(new Spacer(1));
+				this.headerContainer.addChild(new Text(verboseInstructions, 1, 0));
+			}
 			this.headerContainer.addChild(new Spacer(1));
 		} else {
 			// Quiet startup: skip the splash and surrounding padding entirely.
@@ -6960,6 +6983,7 @@ export class InteractiveMode {
 			if (!process.stdout.isTTY) return;
 			this.ui.enterFullscreen({
 				scroll: [
+					this.shellTopBarContainer,
 					this.headerContainer,
 					this.mainViewContainer,
 					this.widgetContainerAbove,

@@ -54,7 +54,7 @@ export class CustomEditor extends Editor {
 	}
 
 	protected override formatPromptPrefix(prefix: string): string {
-		return prefix.startsWith("!") ? this.borderColor(prefix) : prefix;
+		return prefix.startsWith("!") ? this.borderColor(prefix) : (this.commandColor?.(prefix) ?? prefix);
 	}
 
 	protected override getHiddenTextPrefixLength(lineIndex: number, line: string): number {

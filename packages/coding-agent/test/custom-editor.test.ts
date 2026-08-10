@@ -147,6 +147,18 @@ describe("CustomEditor", () => {
 		expect(handler).toHaveBeenCalledTimes(2);
 	});
 
+	it("styles the Capricorn prompt marker through the command accent", () => {
+		const editor = new CustomEditor(
+			fakeTui,
+			{ ...editorTheme, commandColor: (text) => `[accent]${text}[/accent]` },
+			new KeybindingsManager(),
+			{ promptPrefix: "› " },
+		);
+		editor.setText("hello");
+
+		expect(editor.render(40).join("\n")).toContain("[accent]› [/accent]hello");
+	});
+
 	it("renders the editor caret before an empty prompt placeholder", () => {
 		const editor = new CustomEditor(fakeTui, editorTheme, new KeybindingsManager(), {
 			placeholder: "type to start",

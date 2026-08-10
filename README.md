@@ -5,7 +5,7 @@
 <h1 align="center">Capricorn</h1>
 <p align="center"><strong>Ambition, orchestrated.</strong></p>
 
-Capricorn is a self-improving coding and research agent built for serious, long-running work. It combines a persistent IPython control environment, recursive subagents, durable sessions, executable skills, and a continual harness that can preserve useful operating patterns across conversations.
+Capricorn is a self-improving coding and research agent built for serious, long-running work. Its **Summit UI** organizes work as Expeditions, Missions, Crew, and a persistent Trail Bar instead of presenting a generic chat shell. It combines a persistent IPython control environment, recursive subagents, durable sessions, executable skills, and a continual harness that can preserve useful operating patterns across conversations.
 
 ## Brand direction
 
