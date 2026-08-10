@@ -3,6 +3,23 @@
  */
 
 export {
+	ADAPTIVE_WORKSPACE_LIMITS,
+	ADAPTIVE_WORKSPACE_SCHEMA_VERSION,
+	type AdaptiveWorkspaceState,
+	AdaptiveWorkspaceStore,
+	createAdaptiveWorkspaceStore,
+	createEmptyAdaptiveWorkspaceState,
+	createProjectKey,
+	type GuidanceEntry,
+	getAdaptiveWorkspacePaths,
+	type ProjectIdentity,
+	type PromptProjection,
+	projectAdaptiveWorkspacePrompt,
+	resolveProjectIdentity,
+	validateAdaptiveWorkspaceState,
+	type WorkspaceLoadResult,
+} from "./adaptive-workspace.js";
+export {
 	AgentSession,
 	type AgentSessionConfig,
 	type AgentSessionEvent,

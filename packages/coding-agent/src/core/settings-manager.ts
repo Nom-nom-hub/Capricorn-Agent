@@ -27,6 +27,16 @@ export interface AutoRefineSettings {
 	cooldownMs?: number; // default: 20 minutes
 }
 
+export interface AdaptiveWorkspaceSettings {
+	enabled?: boolean; // default: true
+	learning?: "off" | "ask" | "on"; // default: "ask"
+	projectInstincts?: boolean; // default: true
+	tasteMemory?: "off" | "explicit" | "suggest"; // default: "explicit"
+	correctionLearning?: "off" | "ask"; // default: "ask"
+	continuityBriefing?: boolean; // default: true
+	promptBudgetChars?: number; // default: 4000
+}
+
 export interface ProviderRetrySettings {
 	timeoutMs?: number; // SDK/provider request timeout in milliseconds
 	maxRetries?: number; // SDK/provider retry attempts
@@ -135,6 +145,7 @@ export interface Settings {
 	theme?: string;
 	compaction?: CompactionSettings;
 	autoRefine?: AutoRefineSettings;
+	adaptiveWorkspace?: AdaptiveWorkspaceSettings;
 	agentTraces?: AgentTracesSettings;
 	telemetry?: TelemetrySettings;
 	branchSummary?: BranchSummarySettings;
@@ -894,6 +905,25 @@ export class SettingsManager {
 				0,
 				typeof cooldownMs === "number" && Number.isFinite(cooldownMs) ? cooldownMs : 20 * 60_000,
 			),
+		};
+	}
+
+	getAdaptiveWorkspaceSettings(): Required<AdaptiveWorkspaceSettings> {
+		const promptBudgetChars = this.settings.adaptiveWorkspace?.promptBudgetChars;
+		const learning = this.settings.adaptiveWorkspace?.learning;
+		const tasteMemory = this.settings.adaptiveWorkspace?.tasteMemory;
+		const correctionLearning = this.settings.adaptiveWorkspace?.correctionLearning;
+		return {
+			enabled: this.settings.adaptiveWorkspace?.enabled !== false,
+			learning: learning === "off" || learning === "on" ? learning : "ask",
+			projectInstincts: this.settings.adaptiveWorkspace?.projectInstincts !== false,
+			tasteMemory: tasteMemory === "off" || tasteMemory === "suggest" ? tasteMemory : "explicit",
+			correctionLearning: correctionLearning === "off" ? "off" : "ask",
+			continuityBriefing: this.settings.adaptiveWorkspace?.continuityBriefing !== false,
+			promptBudgetChars:
+				typeof promptBudgetChars === "number" && Number.isFinite(promptBudgetChars)
+					? Math.max(500, Math.min(6000, Math.floor(promptBudgetChars)))
+					: 4000,
 		};
 	}
 

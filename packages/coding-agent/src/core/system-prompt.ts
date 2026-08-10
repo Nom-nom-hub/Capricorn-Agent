@@ -33,6 +33,8 @@ export interface BuildSystemPromptOptions {
 	rlmParentAgent?: string;
 	/** Global harness state to inject as compact persistent context. */
 	harnessState?: HarnessState;
+	/** Bounded, host-projected guidance for the current adaptive workspace. */
+	adaptiveWorkspaceContext?: string;
 }
 
 /** Build the system prompt with tools, guidelines, and context */
@@ -48,6 +50,7 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		skills: providedSkills,
 		allowRecursion,
 		harnessState,
+		adaptiveWorkspaceContext,
 	} = options;
 	const promptCwd = cwd.replace(/\\/g, "/");
 	const promptMessagesPath = (messagesPath ?? "not persisted").replace(/\\/g, "/");
@@ -114,6 +117,13 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 			})}`;
 		}
 
+		if (adaptiveWorkspaceContext) {
+			prompt += `
+
+# Adaptive Workspace
+
+${adaptiveWorkspaceContext}`;
+		}
 		if (appendSection) {
 			prompt += appendSection;
 		}
@@ -151,6 +161,13 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		})}`;
 	}
 
+	if (adaptiveWorkspaceContext) {
+		prompt += `
+
+# Adaptive Workspace
+
+${adaptiveWorkspaceContext}`;
+	}
 	const guidelines = formatPromptGuidelines(promptGuidelines);
 	if (guidelines) {
 		prompt += `\n\n# Additional Guidance\n\n${guidelines}`;

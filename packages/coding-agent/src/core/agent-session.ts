@@ -51,6 +51,7 @@ import {
 import { theme } from "../modes/interactive/theme/theme.js";
 import { stripFrontmatter } from "../utils/frontmatter.js";
 import { sleep } from "../utils/sleep.js";
+import { createAdaptiveWorkspaceStore } from "./adaptive-workspace.js";
 import {
 	AGENT_MESSAGE_CUSTOM_TYPE,
 	AGENT_MESSAGE_RECEIVED_PREVIEW_LABEL,
@@ -4472,6 +4473,19 @@ export class AgentSession {
 			loaderAppendSystemPrompt.length > 0 ? loaderAppendSystemPrompt.join("\n\n") : undefined;
 		const loadedSkills = this._modelVisibleSkills();
 		const loadedContextFiles = this._resourceLoader.getAgentsFiles().agentsFiles;
+		const adaptiveSettings = this.settingsManager.getAdaptiveWorkspaceSettings();
+		const adaptiveWorkspaceContext = adaptiveSettings.enabled
+			? createAdaptiveWorkspaceStore({
+					cwd: this._cwd,
+					learningEnabled: adaptiveSettings.learning !== "off",
+				}).projectPrompt({
+					maxCharacters: adaptiveSettings.promptBudgetChars,
+					includeCorrections: adaptiveSettings.correctionLearning !== "off",
+					includeTaste: adaptiveSettings.tasteMemory !== "off",
+					includeInstincts: adaptiveSettings.projectInstincts,
+					includeContinuity: adaptiveSettings.continuityBriefing,
+				}).text
+			: "";
 
 		this._baseSystemPromptOptions = {
 			cwd: this._cwd,
@@ -4487,6 +4501,7 @@ export class AgentSession {
 			rlmDepth: this._rlmDepth,
 			rlmParentAgent: this._rlmParentAgent,
 			harnessState: this._loadMergedHarnessState(),
+			adaptiveWorkspaceContext: adaptiveWorkspaceContext || undefined,
 		};
 		return buildSystemPrompt(this._baseSystemPromptOptions);
 	}
