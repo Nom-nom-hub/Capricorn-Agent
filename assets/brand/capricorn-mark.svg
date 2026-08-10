@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Capricorn mark</title>
+  <desc id="desc">A geometric pair of horns flowing into a Capricorn tail, accented by constellation points.</desc>
+  <g fill="none" stroke="#D4A72C" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M84 128C120 62 194 62 230 132L256 184 282 132C318 62 392 62 428 128"/>
+    <path d="M84 128C82 250 142 310 250 310H330C384 310 414 342 414 386 414 428 384 454 344 454 306 454 282 430 282 398 282 368 304 346 334 346"/>
+  </g>
+  <g fill="#F7F1DF">
+    <circle cx="84" cy="128" r="10"/><circle cx="256" cy="184" r="10"/><circle cx="428" cy="128" r="10"/><circle cx="344" cy="454" r="10"/>
+  </g>
+</svg>
