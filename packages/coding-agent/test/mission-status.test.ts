@@ -131,6 +131,81 @@ describe("mission status", () => {
 		expect(output).toContain("Queued: Run the focused tests");
 	});
 
+	test("distinguishes verified proof from self-reported completion", () => {
+		const verifiedGoal = {
+			active: false,
+			status: "complete" as const,
+			objective: "Ship verified output",
+			tokensUsed: 100,
+			timeUsedSeconds: 3,
+			continuationsUsed: 0,
+			acceptanceChecks: [{ command: "npm test", timeoutSeconds: 120 }],
+			completionKind: "verified" as const,
+			proof: {
+				version: 1 as const,
+				verifiedAt: 10,
+				durationMs: 20,
+				passed: true,
+				worktree: {
+					before: {
+						cwd: "/work/capricorn",
+						gitRoot: "/work/capricorn",
+						head: "abcdef123456",
+						snapshotDigest: "sha256:a",
+					},
+					after: {
+						cwd: "/work/capricorn",
+						gitRoot: "/work/capricorn",
+						head: "abcdef123456",
+						snapshotDigest: "sha256:a",
+					},
+					stable: true,
+				},
+				checks: [
+					{
+						command: "npm test",
+						timeoutSeconds: 120,
+						exitCode: 0,
+						timedOut: false,
+						aborted: false,
+						outputLimitExceeded: false,
+						durationMs: 20,
+						passed: true,
+						stdoutDigest: "sha256:out",
+						stderrDigest: "sha256:err",
+						outputDigest: "sha256:all",
+						outputBytes: 2,
+						outputPreview: "ok",
+						truncated: false,
+					},
+				],
+				certificateDigest: "sha256:certificate",
+			},
+		};
+		const verified = stripAnsi(formatMissionStatus(input({ state: state({ goal: verifiedGoal }) }), 92));
+		expect(verified).toContain("VERIFIED");
+		expect(verified).toContain("1/1 checks passed");
+		expect(verified).toContain("abcdef12");
+
+		const selfReported = stripAnsi(
+			formatMissionStatus(
+				input({
+					state: state({
+						goal: {
+							...verifiedGoal,
+							acceptanceChecks: undefined,
+							proof: undefined,
+							completionKind: "self_reported",
+						},
+					}),
+				}),
+				92,
+			),
+		);
+		expect(selfReported).toContain("SELF-REPORTED");
+		expect(selfReported).toContain("No executable acceptance checks declared");
+	});
+
 	test("keeps every rendered line within the requested width", () => {
 		const output = stripAnsi(formatMissionStatus(input(), 48));
 		for (const line of output.split("\n")) expect([...line].length).toBeLessThanOrEqual(48);

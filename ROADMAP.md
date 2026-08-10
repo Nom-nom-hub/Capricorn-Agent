@@ -8,11 +8,11 @@ Capricorn is focused on verifiable, long-running agent work. These features are 
 
 `/mission` provides a live, model-free view of the active goal, Git workspace, model/run state, context usage, direct subagents, queued input, and the next deterministic action. It does not spend tokens or ask a model to invent status.
 
-## Next
-
 ### Proof-Carrying Goals
 
-Goals can declare executable acceptance checks. Capricorn reruns them before completion and records a bounded, auditable certificate containing exit status, time, output digest, and worktree identity. Unverified goals remain clearly labeled as self-reported.
+`/goal --check "<command>"` attaches user-approved executable acceptance checks. Capricorn reruns them before completion and records a bounded certificate with exit status, duration, output digests and preview, plus tamper-evident, stable before/after Git source-worktree identity. Failed checks keep the goal incomplete; goals without checks are visibly self-reported.
+
+## Next
 
 ### Campaigns
 

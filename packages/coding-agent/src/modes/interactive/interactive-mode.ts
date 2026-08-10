@@ -493,6 +493,8 @@ type GoalAnnouncementSnapshot = {
 	objective?: string;
 	lastReason?: string;
 	lastError?: string;
+	proofPassed?: boolean;
+	proofVerifiedAt?: number;
 };
 
 type ModelFallbackWarningAction = "show" | "suppress";
@@ -5796,6 +5798,8 @@ export class InteractiveMode {
 			objective: goal.objective,
 			lastReason: goal.lastReason,
 			lastError: goal.lastError,
+			proofPassed: goal.proof?.passed,
+			proofVerifiedAt: goal.proof?.verifiedAt,
 		};
 	}
 
@@ -5814,7 +5818,7 @@ export class InteractiveMode {
 		}
 		switch (goal.status) {
 			case "active":
-				return false;
+				return previous.proofPassed !== next.proofPassed || previous.proofVerifiedAt !== next.proofVerifiedAt;
 			case "paused":
 			case "budget_limited":
 			case "complete":
@@ -5836,10 +5840,11 @@ export class InteractiveMode {
 		switch (goal.status) {
 			case "idle":
 				return "No active goal";
-			case "active":
-				return goal.objective
-					? `Goal${this.formatGoalDetailSuffix(goal.objective, visibleWidth("Goal"))}`
-					: "Pursuing goal";
+			case "active": {
+				const prefix = goal.proof && !goal.proof.passed ? "Goal proof failed" : "Goal";
+				const detail = goal.proof && !goal.proof.passed ? goal.lastReason : goal.objective;
+				return detail ? `${prefix}${this.formatGoalDetailSuffix(detail, visibleWidth(prefix))}` : "Pursuing goal";
+			}
 			case "paused":
 				return goal.lastReason
 					? `Goal paused${this.formatGoalDetailSuffix(goal.lastReason, visibleWidth("Goal paused"))}`
@@ -5850,10 +5855,13 @@ export class InteractiveMode {
 					return prefix + this.formatGoalDetailSuffix(goal.lastReason, visibleWidth(prefix));
 				}
 				return `Goal budget limited${usageText}`;
-			case "complete":
+			case "complete": {
+				const proof = goal.completionKind === "verified" ? "verified" : "self-reported";
+				const prefix = `Goal complete · ${proof}`;
 				return goal.lastReason
-					? `Goal complete${this.formatGoalDetailSuffix(goal.lastReason, visibleWidth("Goal complete"))}`
-					: "Goal complete";
+					? `${prefix}${this.formatGoalDetailSuffix(goal.lastReason, visibleWidth(prefix))}`
+					: prefix;
+			}
 			case "error":
 				return goal.lastError
 					? `Goal error${this.formatGoalDetailSuffix(goal.lastError, visibleWidth("Goal error"))}`

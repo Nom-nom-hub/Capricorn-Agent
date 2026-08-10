@@ -40,6 +40,20 @@ capricorn doctor --fix
 capricorn shutdown
 ```
 
+## Proof-Carrying Goals
+
+Capricorn goals can carry user-approved executable acceptance checks. The host reruns the persisted checks whenever the agent requests completion; every check must pass against a stable worktree before the goal becomes **verified**.
+
+```text
+/goal --check "npm test" --check "npm run check" --proof-timeout 180 Ship the release
+```
+
+The resulting bounded certificate records exit status, duration, output digests and preview, and before/after Git source-worktree identity. Identity covers HEAD, branch, status, submodules, tracked content, and nonignored untracked content; ignored build artifacts are intentionally excluded. Verified completion requires a Git workspace with a stable identity. Inspect the latest receipt with `/goal proof` or the mission summary with `/mission`.
+
+A policy supports up to eight checks, at most 300 seconds each and 10 minutes total. Each receipt retains at most an 8,000-character preview and fails closed above 10 MiB of command output.
+
+Failed checks leave the goal incomplete. Goals without checks can still complete, but Summit UI labels them **self-reported**. Checks are local shell commands with your user permissions—not a sandbox—and can only be declared through the user-facing `/goal` command, never by `goal.create()` or objective text. Certificates are tamper-evident local receipts, not signatures: Capricorn treats same-user session storage as trusted local state. Timeout cancellation performs best-effort process-tree termination; independently daemonized descendants may require external cleanup.
+
 ## Privacy and releases
 
 Telemetry to the upstream Prime endpoint is **off by default** in Capricorn. It can still be explicitly enabled in settings if desired. Automatic update checks are also off until `CAPRICORN_DOWNLOAD_BASE_URL` points to a release manifest host you control; this avoids installing upstream Prime Agent artifacts into a Capricorn installation.

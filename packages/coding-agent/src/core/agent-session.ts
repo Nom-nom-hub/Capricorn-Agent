@@ -153,12 +153,19 @@ import {
 } from "./extensions/index.js";
 import { emitSessionShutdownEvent } from "./extensions/runner.js";
 import {
+	DEFAULT_GOAL_CHECK_TIMEOUT_SECONDS,
+	validateGoalAcceptanceChecks,
+	validateGoalCheckTimeoutSeconds,
+	verifyGoalAcceptanceChecks,
+} from "./goal-verification.js";
+import {
 	createGoalContextMessage,
 	emptyGoalState,
 	GOAL_CONTEXT_CUSTOM_TYPE,
 	GOAL_CONTEXT_PREVIEW_LABEL,
 	GOAL_SKILL_NAME,
 	GOAL_STATE_CUSTOM_TYPE,
+	type GoalAcceptanceCheck,
 	type GoalHostResponse,
 	type GoalState,
 	type GoalStatus,
@@ -909,10 +916,11 @@ interface ToolDefinitionEntry {
 
 type GoalSlashCommand =
 	| { kind: "status" }
+	| { kind: "proof" }
 	| { kind: "clear" }
 	| { kind: "pause" }
 	| { kind: "resume" }
-	| { kind: "start"; objective: string; tokenBudget?: number };
+	| { kind: "start"; objective: string; tokenBudget?: number; acceptanceChecks: GoalAcceptanceCheck[] };
 
 type AutonomousSlashCommand = { kind: "status" } | { kind: "on" } | { kind: "off" };
 
@@ -1009,6 +1017,48 @@ function parseGoalBudgetValue(value: string): number {
 		throw new Error("Goal token budget must be a positive integer.");
 	}
 	return budget;
+}
+
+function parseGoalCommandArguments(input: string): string[] {
+	const args: string[] = [];
+	let current = "";
+	let quote: "'" | '"' | undefined;
+	let tokenStarted = false;
+	for (let index = 0; index < input.length; index++) {
+		const character = input[index];
+		if (character === "\\" && quote !== "'") {
+			const next = input[index + 1];
+			if (next === undefined) throw new Error("Goal command ends with an incomplete escape.");
+			current += next;
+			tokenStarted = true;
+			index += 1;
+			continue;
+		}
+		if (quote) {
+			if (character === quote) quote = undefined;
+			else current += character;
+			tokenStarted = true;
+			continue;
+		}
+		if (character === "'" || character === '"') {
+			quote = character;
+			tokenStarted = true;
+			continue;
+		}
+		if (/\s/u.test(character)) {
+			if (tokenStarted) {
+				args.push(current);
+				current = "";
+				tokenStarted = false;
+			}
+			continue;
+		}
+		current += character;
+		tokenStarted = true;
+	}
+	if (quote) throw new Error(`Goal command has an unterminated ${quote} quote.`);
+	if (tokenStarted) args.push(current);
+	return args;
 }
 
 export function compactRlmText(text: string, maxLength = 160): string {
@@ -1124,6 +1174,9 @@ export class AgentSession {
 	private _goalAccountingStartedAt: number | undefined = undefined;
 	private _goalAccountedAssistantMessages = new WeakSet<AssistantMessage>();
 	private _goalAbortInProgress = false;
+	private _goalVerificationInFlight: Promise<GoalState> | undefined;
+	private _goalVerificationAbortController: AbortController | undefined;
+	private _goalVerificationGoalId: string | undefined;
 	private _autonomousState: AutonomousRuntimeState;
 	private _autonomousContinuationSuppressionDepth = 0;
 	private _autonomousContinuationSuppressedMessages = new WeakSet<AgentMessage>();
@@ -1778,9 +1831,22 @@ export class AgentSession {
 		this._emitQueueUpdate();
 	}
 
-	private _startGoal(objectiveText: string, tokenBudget: number | undefined): GoalState {
+	private _cancelGoalVerification(): void {
+		this._goalVerificationAbortController?.abort();
+		this._goalVerificationAbortController = undefined;
+		this._goalVerificationInFlight = undefined;
+		this._goalVerificationGoalId = undefined;
+	}
+
+	private _startGoal(
+		objectiveText: string,
+		tokenBudget: number | undefined,
+		acceptanceChecks: readonly GoalAcceptanceCheck[] = [],
+	): GoalState {
+		this._cancelGoalVerification();
 		const objective = validateGoalObjective(objectiveText);
 		const budget = validateGoalBudget(tokenBudget);
+		const checks = validateGoalAcceptanceChecks(acceptanceChecks);
 		const now = Date.now();
 		const goal: GoalState = {
 			active: true,
@@ -1793,6 +1859,7 @@ export class AgentSession {
 			continuationsUsed: 0,
 			createdAt: now,
 			updatedAt: now,
+			...(checks.length > 0 ? { acceptanceChecks: checks } : {}),
 		};
 		this._goalAccountingStartedAt = now;
 		this._setGoalState(goal);
@@ -1800,11 +1867,13 @@ export class AgentSession {
 	}
 
 	private _clearGoal(): void {
+		this._cancelGoalVerification();
 		this._clearQueuedGoalContexts();
 		this._setGoalState(emptyGoalState());
 	}
 
 	private _pauseGoal(reason = "Paused by user"): void {
+		this._cancelGoalVerification();
 		this._clearQueuedGoalContexts();
 		if (this._goalState.status !== "active") {
 			this._emitGoalUpdate();
@@ -1895,50 +1964,59 @@ export class AgentSession {
 
 		const rest = command.args;
 		const normalized = rest.toLowerCase();
-		if (!rest || normalized === "status") {
-			return { kind: "status" };
-		}
-		if (normalized === "clear" || normalized === "stop") {
-			return { kind: "clear" };
-		}
-		if (normalized === "pause") {
-			return { kind: "pause" };
-		}
-		if (normalized === "resume") {
-			return { kind: "resume" };
-		}
+		if (!rest || normalized === "status") return { kind: "status" };
+		if (normalized === "proof" || normalized === "certificate") return { kind: "proof" };
+		if (normalized === "clear" || normalized === "stop") return { kind: "clear" };
+		if (normalized === "pause") return { kind: "pause" };
+		if (normalized === "resume") return { kind: "resume" };
 
+		const usage = 'Usage: /goal [--budget <tokens>] [--check "<command>"] [--proof-timeout <seconds>] <objective>';
+		const args = parseGoalCommandArguments(rest);
 		let tokenBudget: number | undefined;
-		let objective = rest;
-		const firstToken = rest.split(/\s+/, 1)[0] ?? "";
-		if (
-			firstToken === "--budget" ||
-			firstToken === "--token-budget" ||
-			firstToken.startsWith("--budget=") ||
-			firstToken.startsWith("--token-budget=")
-		) {
-			let valueText: string;
-			if (firstToken === "--budget" || firstToken === "--token-budget") {
-				const withoutFlag = rest.slice(firstToken.length).trimStart();
-				const nextSpace = withoutFlag.search(/\s/);
-				if (nextSpace < 0) {
-					throw new Error("Usage: /goal [--budget <tokens>] <objective>");
-				}
-				valueText = withoutFlag.slice(0, nextSpace);
-				objective = withoutFlag.slice(nextSpace + 1).trim();
-			} else {
-				const separator = firstToken.indexOf("=");
-				valueText = firstToken.slice(separator + 1);
-				objective = rest.slice(firstToken.length).trim();
+		let timeoutSeconds = DEFAULT_GOAL_CHECK_TIMEOUT_SECONDS;
+		const checkCommands: string[] = [];
+		let index = 0;
+		const optionValue = (token: string, names: string[]): { value: string; consumed: number } | undefined => {
+			if (names.includes(token)) {
+				const value = args[index + 1];
+				if (value === undefined) throw new Error(usage);
+				return { value, consumed: 2 };
 			}
-			tokenBudget = parseGoalBudgetValue(valueText);
-		}
-
-		return {
-			kind: "start",
-			objective: validateGoalObjective(objective),
-			tokenBudget,
+			const prefix = names.find((name) => token.startsWith(`${name}=`));
+			if (!prefix) return undefined;
+			const value = token.slice(prefix.length + 1);
+			if (!value) throw new Error(usage);
+			return { value, consumed: 1 };
 		};
+
+		while (index < args.length && args[index].startsWith("--")) {
+			const token = args[index];
+			const budget = optionValue(token, ["--budget", "--token-budget"]);
+			if (budget) {
+				if (tokenBudget !== undefined) throw new Error("Goal token budget may only be specified once.");
+				tokenBudget = parseGoalBudgetValue(budget.value);
+				index += budget.consumed;
+				continue;
+			}
+			const check = optionValue(token, ["--check"]);
+			if (check) {
+				checkCommands.push(check.value);
+				index += check.consumed;
+				continue;
+			}
+			const timeout = optionValue(token, ["--proof-timeout", "--check-timeout"]);
+			if (timeout) {
+				timeoutSeconds = validateGoalCheckTimeoutSeconds(Number(timeout.value));
+				index += timeout.consumed;
+				continue;
+			}
+			throw new Error(`Unknown goal option: ${token}. ${usage}`);
+		}
+		const objective = validateGoalObjective(args.slice(index).join(" "));
+		const acceptanceChecks = validateGoalAcceptanceChecks(
+			checkCommands.map((checkCommand) => ({ command: checkCommand, timeoutSeconds })),
+		);
+		return { kind: "start", objective, tokenBudget, acceptanceChecks };
 	}
 
 	private _parseAutonomousSlashCommand(text: string): AutonomousSlashCommand | undefined {
@@ -1955,6 +2033,41 @@ export class AgentSession {
 			return { kind: "off" };
 		}
 		throw new Error("Usage: /autonomous [on|off|status]");
+	}
+
+	private _formatGoalProofCertificate(): string {
+		const checks = this._goalState.acceptanceChecks ?? [];
+		const proof = this._goalState.proof;
+		if (!proof) {
+			return checks.length > 0
+				? `No proof certificate yet. ${checks.length} acceptance check${checks.length === 1 ? " is" : "s are"} pending.`
+				: "No proof certificate: this goal has no executable acceptance checks and completion will be self-reported.";
+		}
+		const lines = [
+			`Proof certificate: ${proof.passed ? "VERIFIED" : "FAILED"}`,
+			`Recorded: ${new Date(proof.verifiedAt).toISOString()} · ${proof.durationMs}ms`,
+			`Workspace: ${proof.worktree.stable ? "stable" : "changed"}${proof.worktree.after.head ? ` · ${proof.worktree.after.head}` : " · not Git-bound"}`,
+			`Snapshot: ${proof.worktree.after.snapshotDigest ?? "unavailable"}`,
+			`Certificate: ${proof.certificateDigest}`,
+		];
+		for (const [index, check] of proof.checks.entries()) {
+			const outcome = check.passed
+				? "PASS"
+				: check.timedOut
+					? "TIMEOUT"
+					: check.aborted
+						? "CANCELLED"
+						: check.outputLimitExceeded
+							? "OUTPUT LIMIT"
+							: "FAIL";
+			lines.push(
+				`${index + 1}. ${outcome} · exit ${check.exitCode ?? "—"} · ${check.durationMs}ms · ${check.outputBytes} bytes`,
+				`   ${check.outputDigest}`,
+			);
+			const preview = check.outputPreview.replace(/\s+/g, " ").trim();
+			if (preview) lines.push(`   ${preview.slice(0, 240)}${preview.length > 240 ? "…" : ""}`);
+		}
+		return lines.join("\n");
 	}
 
 	private _formatAutonomousStatus(): string {
@@ -2074,7 +2187,7 @@ export class AgentSession {
 			return false;
 		}
 
-		if (command.kind === "status") {
+		if (command.kind === "status" || command.kind === "proof") {
 			this._emitGoalUpdate();
 			return true;
 		}
@@ -2100,7 +2213,7 @@ export class AgentSession {
 		}
 		this._ensureGoalRuntimeActive();
 		this._clearQueuedGoalContexts();
-		this._startGoal(command.objective, command.tokenBudget);
+		this._startGoal(command.objective, command.tokenBudget, command.acceptanceChecks);
 		await this._runOrQueueGoalContext(previousWasActive ? "objective_updated" : "continuation", images);
 		return true;
 	}
@@ -2816,14 +2929,27 @@ export class AgentSession {
 	 * goal skill). All goal state stays host-side; the kernel only sees the
 	 * serialized snake_case response.
 	 */
-	handleGoalHostRequest(type: string, payload: Record<string, unknown> = {}): GoalHostResponse {
-		if (!this._includeGoals) {
-			throw new Error("goals are disabled in this session");
-		}
+	handleGoalHostRequest(type: "goal.get" | "goal.create", payload?: Record<string, unknown>): GoalHostResponse;
+	handleGoalHostRequest(type: "goal.complete", payload?: Record<string, unknown>): Promise<GoalHostResponse>;
+	handleGoalHostRequest(type: string, payload?: Record<string, unknown>): GoalHostResponse | Promise<GoalHostResponse>;
+	handleGoalHostRequest(
+		type: string,
+		payload: Record<string, unknown> = {},
+	): GoalHostResponse | Promise<GoalHostResponse> {
+		if (!this._includeGoals) throw new Error("goals are disabled in this session");
 		switch (type) {
 			case "goal.get":
 				return goalHostResponse(this.goalState, false);
 			case "goal.create": {
+				if (
+					payload.acceptance_checks !== undefined ||
+					payload.acceptanceChecks !== undefined ||
+					payload.checks !== undefined
+				) {
+					throw new Error(
+						"goal.create cannot declare executable acceptance checks; the user must approve them through /goal --check",
+					);
+				}
 				if (typeof payload.objective !== "string") {
 					throw new Error("goal.create objective must be a string");
 				}
@@ -2833,7 +2959,8 @@ export class AgentSession {
 				return goalHostResponse(this._createGoalFromHost(payload.objective, payload.token_budget), false);
 			}
 			case "goal.complete":
-				return goalHostResponse(this._completeGoalFromHost(), true);
+				this._assertGoalCanComplete();
+				return this._completeGoalFromHost().then((goal) => goalHostResponse(goal, true));
 			default:
 				throw new Error(`unknown goal request type "${type}"`);
 		}
@@ -3141,20 +3268,73 @@ export class AgentSession {
 		}
 	}
 
-	private _completeGoalFromHost(): GoalState {
+	private _assertGoalCanComplete(): void {
 		if (!this._goalState.objective || this._goalState.status === "idle") {
 			throw new Error("cannot complete goal because this thread has no goal");
 		}
+	}
+
+	private _completeGoalFromHost(): Promise<GoalState> {
+		this._assertGoalCanComplete();
+		if (this._goalState.status === "complete") return Promise.resolve(this._goalState);
+		if (this._goalVerificationInFlight && this._goalVerificationGoalId === this._goalState.goalId) {
+			return this._goalVerificationInFlight;
+		}
+		if (this._goalVerificationInFlight) this._cancelGoalVerification();
+		const controller = new AbortController();
+		this._goalVerificationAbortController = controller;
+		this._goalVerificationGoalId = this._goalState.goalId;
+		const verification = this._runGoalCompletionProof(controller.signal);
+		this._goalVerificationInFlight = verification;
+		const clearInFlight = () => {
+			if (this._goalVerificationInFlight === verification) {
+				this._goalVerificationInFlight = undefined;
+				this._goalVerificationAbortController = undefined;
+				this._goalVerificationGoalId = undefined;
+			}
+		};
+		void verification.then(clearInFlight, clearInFlight);
+		return verification;
+	}
+
+	private async _runGoalCompletionProof(signal: AbortSignal): Promise<GoalState> {
+		const goalId = this._goalState.goalId;
+		const checks = this._goalState.acceptanceChecks ?? [];
+		let proof = this._goalState.proof;
+		if (checks.length > 0) {
+			proof = await verifyGoalAcceptanceChecks({ goalId, checks, cwd: this._cwd, signal });
+			if (signal.aborted) throw new Error("Goal proof verification was cancelled.");
+			if (this._goalState.goalId !== goalId || !this._goalState.objective) {
+				throw new Error("Goal changed while acceptance checks were running; discarded the proof result.");
+			}
+			if (!proof.passed) {
+				const failedIndex = proof.checks.findIndex((check) => !check.passed);
+				const gitBound = Boolean(proof.worktree.before.gitRoot && proof.worktree.after.gitRoot);
+				const reason = proof.worktree.stable
+					? `Proof check ${failedIndex + 1} failed; goal remains incomplete`
+					: gitBound
+						? "Workspace changed while proof checks ran; rerun verification on the stable result"
+						: "Verified completion requires a Git workspace with a stable source identity";
+				this._setGoalState({
+					...this._goalWithAccountedWallClock(),
+					proof,
+					completionKind: undefined,
+					lastReason: reason,
+					lastError: undefined,
+				});
+				throw new Error(reason);
+			}
+		}
+
 		const goal = this._goalWithAccountedWallClock();
-		// A turn can cross the budget and complete the goal at once: accounting
-		// runs at message_end, before the completing ipython cell executes, so a
-		// budget-limit context may already be steered. It is stale now — drop it.
 		this._clearQueuedGoalContexts();
 		this._setGoalState({
 			...goal,
 			active: false,
 			status: "complete",
-			lastReason: "Goal achieved",
+			proof,
+			completionKind: checks.length > 0 ? "verified" : "self_reported",
+			lastReason: checks.length > 0 ? "Goal achieved with verified proof" : "Goal achieved (self-reported)",
 			lastError: undefined,
 		});
 		return this._goalState;
@@ -3975,6 +4155,7 @@ export class AgentSession {
 		}
 		this._disposed = true;
 		this._sessionActionCommitDisposeAbortController.abort();
+		this._cancelGoalVerification();
 		try {
 			// Invalidate scheduled timers and abort any in-flight review so a late
 			// resolution cannot write harness state or re-subscribe handlers.
@@ -5820,12 +6001,29 @@ export class AgentSession {
 					resultText = `Refined continual harness state: ${applied} edit${applied === 1 ? "" : "s"} applied.`;
 					break;
 				}
-				case "goal":
+				case "goal": {
+					const goalCommand = this._parseGoalSlashCommand(input.text);
 					await this._handleGoalSlashCommand(input.text, input.images);
+					if (goalCommand?.kind === "proof") {
+						resultText = this._formatGoalProofCertificate();
+						break;
+					}
+					const checks = this._goalState.acceptanceChecks ?? [];
+					const proof =
+						checks.length === 0
+							? this._goalState.status === "complete"
+								? " · self-reported"
+								: " · no acceptance checks"
+							: this._goalState.proof?.passed && this._goalState.completionKind === "verified"
+								? ` · verified (${checks.length}/${checks.length} checks)`
+								: this._goalState.proof
+									? ` · proof failed (${this._goalState.proof.checks.filter((check) => check.passed).length}/${checks.length} checks)`
+									: ` · proof pending (${checks.length} check${checks.length === 1 ? "" : "s"})`;
 					resultText = this._goalState.objective
-						? `Goal ${this._goalState.status}: ${this._goalState.objective}`
+						? `Goal ${this._goalState.status}${proof}: ${this._goalState.objective}`
 						: "No active goal.";
 					break;
+				}
 				case "autonomous":
 					await this._handleAutonomousSlashCommand(input.text);
 					break;

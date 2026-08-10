@@ -1,8 +1,8 @@
-"""Prime Agent goal skill: manage the persistent thread goal from the kernel.
+"""Capricorn goal skill: manage the persistent thread goal from the kernel.
 
 All goal state lives in the TypeScript host; these functions are thin typed
 wrappers over the generic host bridge (`rlm.host_request`). They only work
-inside the Prime Agent IPython kernel.
+inside the Capricorn IPython kernel.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ async def get() -> dict[str, Any]:
 
     Returns a dict with `goal` (None when no goal is set), `remaining_tokens`,
     and `completion_budget_report`. The `goal` dict carries the objective,
-    status, token budget, and token/elapsed-time usage.
+    status, token budget, usage, acceptance checks, and proof certificate.
     """
     return await host_request("goal.get")
 
@@ -42,11 +42,11 @@ async def create(objective: str, token_budget: int | None = None) -> dict[str, A
 
 
 async def complete() -> dict[str, Any]:
-    """Mark the existing thread goal achieved.
+    """Request completion of the existing thread goal.
 
-    Use only when the objective has actually been achieved and no required
-    work remains — not because the budget is nearly exhausted or because you
-    are stopping work. Pause, resume, and budget-limit transitions are
-    controlled by the user and the host.
+    The host reruns any user-declared acceptance checks and refuses completion
+    if a check fails. Without checks, completion is labeled self-reported. Use
+    only when the objective is actually achieved; proof commands cannot be
+    supplied or changed through this API.
     """
     return await host_request("goal.complete")

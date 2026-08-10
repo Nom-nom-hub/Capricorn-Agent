@@ -66,6 +66,35 @@ export function readMissionWorkspaceStatus(cwd: string): MissionWorkspaceStatus 
 	return parseMissionGitStatus(result.stdout);
 }
 
+function formatGoalProof(goal: GoalState): { badge: string; detail: string } {
+	const checks = goal.acceptanceChecks ?? [];
+	if (checks.length === 0) {
+		return {
+			badge: goal.status === "complete" ? "SELF-REPORTED" : "NO CHECKS",
+			detail: "No executable acceptance checks declared",
+		};
+	}
+	if (!goal.proof) {
+		return {
+			badge: "PROOF PENDING",
+			detail: `${checks.length} acceptance check${checks.length === 1 ? "" : "s"} will run before completion`,
+		};
+	}
+	const passed = goal.proof.checks.filter((check) => check.passed).length;
+	const head = goal.proof.worktree.after.head?.slice(0, 8);
+	const workspace = !goal.proof.worktree.after.gitRoot
+		? " · not Git-bound"
+		: goal.proof.worktree.stable
+			? head
+				? ` · ${head}`
+				: " · stable workspace"
+			: " · workspace changed";
+	return {
+		badge: goal.proof.passed && goal.completionKind === "verified" ? "VERIFIED" : "PROOF FAILED",
+		detail: `${passed}/${goal.proof.checks.length} checks passed${workspace}`,
+	};
+}
+
 function formatGoal(goal: GoalState): string[] {
 	if (goal.status === "idle") {
 		return [theme.fg("muted", "No mission set"), theme.fg("dim", "Set one with /goal <objective>")];
@@ -74,9 +103,11 @@ function formatGoal(goal: GoalState): string[] {
 		goal.tokenBudget === undefined
 			? `${goal.tokensUsed.toLocaleString()} tokens used`
 			: `${goal.tokensUsed.toLocaleString()} / ${goal.tokenBudget.toLocaleString()} tokens`;
+	const proof = formatGoalProof(goal);
 	return [
-		`${theme.fg(goal.status === "error" ? "error" : "accent", goal.status.toUpperCase())}  ${theme.fg("dim", usage)}`,
+		`${theme.fg(goal.status === "error" ? "error" : "accent", goal.status.toUpperCase())}  ${theme.bold(proof.badge)}  ${theme.fg("dim", usage)}`,
 		goal.objective ?? "Mission objective unavailable",
+		theme.fg(goal.proof && !goal.proof.passed ? "error" : "dim", `Proof: ${proof.detail}`),
 		...(goal.lastError
 			? [theme.fg("error", goal.lastError)]
 			: goal.lastReason
@@ -114,6 +145,14 @@ function nextAction(
 ): string {
 	const queued = queue.steering[0] ?? queue.followUp[0];
 	if (queued) return `Queued: ${queued.replace(/\s+/g, " ").trim()}`;
+	if (goal.proof && !goal.proof.passed) {
+		const failed = goal.proof.checks.filter((check) => !check.passed).length;
+		return goal.proof.worktree.stable
+			? `Repair ${failed} failed acceptance check${failed === 1 ? "" : "s"}`
+			: goal.proof.worktree.after.gitRoot
+				? "Review workspace changes, then rerun proof on the stable result"
+				: "Use a Git workspace before requesting verified completion";
+	}
 	const failed = children.filter((child) => child.status === "error").length;
 	if (failed > 0) return `Review ${failed} failed subagent${failed === 1 ? "" : "s"}`;
 	const running = children.filter((child) => child.status === "running" || child.status === "queued").length;

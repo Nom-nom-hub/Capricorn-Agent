@@ -45,7 +45,18 @@ export function formatExpeditionDockHeader(goal: GoalState | undefined): string 
 	}
 	const objective = goal.objective?.replace(/\s+/g, " ").trim();
 	const tone = goal.status === "error" ? "error" : goal.status === "complete" ? "success" : "accent";
-	const status = theme.bold(theme.fg(tone, `MISSION · ${goal.status.toUpperCase()}`));
+	const checks = goal.acceptanceChecks ?? [];
+	const proofLabel =
+		checks.length === 0
+			? goal.status === "complete"
+				? " · SELF-REPORTED"
+				: ""
+			: goal.proof?.passed && goal.completionKind === "verified"
+				? " · VERIFIED"
+				: goal.proof
+					? " · PROOF FAILED"
+					: " · PROOF PENDING";
+	const status = theme.bold(theme.fg(tone, `MISSION · ${goal.status.toUpperCase()}${proofLabel}`));
 	return objective ? `${status}${theme.fg("dim", `  ${objective}`)}` : status;
 }
 

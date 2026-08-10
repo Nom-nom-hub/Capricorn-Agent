@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { AgentContext, AgentTool } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
@@ -48,6 +49,14 @@ function currentAgentContext(harness: Harness): AgentContext {
 	};
 }
 
+function initializeProofGitWorkspace(harness: Harness): void {
+	spawnSync("git", ["init", "-q"], { cwd: harness.tempDir });
+	spawnSync("git", ["config", "user.email", "proof@capricorn.local"], { cwd: harness.tempDir });
+	spawnSync("git", ["config", "user.name", "Capricorn Proof"], { cwd: harness.tempDir });
+	spawnSync("git", ["add", "-A"], { cwd: harness.tempDir });
+	spawnSync("git", ["commit", "--allow-empty", "-qm", "proof fixture"], { cwd: harness.tempDir });
+}
+
 async function waitForCondition(predicate: () => boolean): Promise<void> {
 	for (let attempt = 0; attempt < 100; attempt++) {
 		if (predicate()) {
@@ -83,7 +92,7 @@ function createFauxIpythonTool(sessionRef: { current?: AgentSession }): AgentToo
 				const spaceIndex = code.indexOf(" ");
 				const type = spaceIndex < 0 ? code : code.slice(0, spaceIndex);
 				const payload = spaceIndex < 0 ? {} : JSON.parse(code.slice(spaceIndex + 1));
-				text = JSON.stringify(session.handleGoalHostRequest(type, payload));
+				text = JSON.stringify(await session.handleGoalHostRequest(type, payload));
 			}
 			return {
 				content: [{ type: "text", text }],
@@ -183,7 +192,7 @@ describe("AgentSession goals", () => {
 			active: false,
 			status: "complete",
 			continuationsUsed: 2,
-			lastReason: "Goal achieved",
+			lastReason: "Goal achieved (self-reported)",
 		});
 		expect(harness.getPendingResponseCount()).toBe(0);
 	});
@@ -257,9 +266,129 @@ describe("AgentSession goals", () => {
 		});
 		expect(created.remaining_tokens).toBe(50);
 
-		const completed = harness.session.handleGoalHostRequest("goal.complete");
-		expect(completed.goal).toMatchObject({ status: "complete" });
+		const completed = await harness.session.handleGoalHostRequest("goal.complete");
+		expect(completed.goal).toMatchObject({ status: "complete", completion_kind: "self_reported" });
 		expect(completed.completion_budget_report).toContain("tokens used: 0 of 50");
+	});
+
+	it("parses user-declared acceptance checks without exposing them through goal.create", async () => {
+		const harness = await createGoalHarness();
+		const command = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
+		const parsed = Reflect.get(AgentSession.prototype, "_parseGoalSlashCommand").call(
+			harness.session,
+			`/goal --budget 500 --check '${command}' --proof-timeout 7 ship verified output`,
+		);
+		expect(
+			Reflect.get(AgentSession.prototype, "_parseGoalSlashCommand").call(harness.session, "/goal proof"),
+		).toEqual({
+			kind: "proof",
+		});
+		expect(parsed).toMatchObject({
+			kind: "start",
+			objective: "ship verified output",
+			tokenBudget: 500,
+			acceptanceChecks: [{ command, timeoutSeconds: 7 }],
+		});
+		expect(() =>
+			harness.session.handleGoalHostRequest("goal.create", {
+				objective: "model-created goal",
+				acceptance_checks: [{ command: "unsafe" }],
+			}),
+		).toThrow("the user must approve them through /goal --check");
+		expect(harness.session.goalState.status).toBe("idle");
+		const quoted = Reflect.get(AgentSession.prototype, "_parseGoalSlashCommand").call(
+			harness.session,
+			'/goal --check "printf \\"hello world\\"" preserve quoting',
+		);
+		expect(quoted.acceptanceChecks).toEqual([{ command: 'printf "hello world"', timeoutSeconds: 120 }]);
+		expect(() =>
+			Reflect.get(AgentSession.prototype, "_parseGoalSlashCommand").call(
+				harness.session,
+				'/goal --check "unterminated objective',
+			),
+		).toThrow("unterminated");
+	});
+
+	it("completes only after declared checks pass and stores their certificate", async () => {
+		const harness = await createGoalHarness();
+		initializeProofGitWorkspace(harness);
+		const command = `${JSON.stringify(process.execPath)} -e "process.stdout.write('verified')"`;
+		Reflect.get(AgentSession.prototype, "_startGoal").call(harness.session, "ship verified output", undefined, [
+			{ command, timeoutSeconds: 5 },
+		]);
+
+		const response = await harness.session.handleGoalHostRequest("goal.complete");
+		expect(response.goal).toMatchObject({
+			status: "complete",
+			completion_kind: "verified",
+			acceptance_checks: [{ command, timeout_seconds: 5 }],
+			proof: {
+				passed: true,
+				checks: [{ exit_code: 0, timed_out: false, output_digest: expect.stringMatching(/^sha256:/) }],
+			},
+		});
+		expect(harness.session.goalState).toMatchObject({
+			status: "complete",
+			completionKind: "verified",
+			proof: { version: 1, passed: true },
+		});
+		expect(harness.session.goalState.proof?.checks[0].outputPreview).toContain("verified");
+		const receipt = Reflect.get(AgentSession.prototype, "_formatGoalProofCertificate").call(harness.session);
+		expect(receipt).toContain("Proof certificate: VERIFIED");
+		expect(receipt).toContain("1. PASS · exit 0");
+		expect(receipt).toContain(`Certificate: ${harness.session.goalState.proof?.certificateDigest}`);
+	});
+
+	it("keeps a goal incomplete with a durable failed proof receipt", async () => {
+		const harness = await createGoalHarness();
+		initializeProofGitWorkspace(harness);
+		const command = `${JSON.stringify(process.execPath)} -e "process.stderr.write('failed'); process.exit(4)"`;
+		Reflect.get(AgentSession.prototype, "_startGoal").call(harness.session, "must pass proof", undefined, [
+			{ command, timeoutSeconds: 5 },
+		]);
+
+		await expect(harness.session.handleGoalHostRequest("goal.complete")).rejects.toThrow("Proof check 1 failed");
+		expect(harness.session.goalState).toMatchObject({
+			status: "active",
+			completionKind: undefined,
+			proof: { passed: false },
+		});
+		expect(harness.session.goalState.proof?.checks[0]).toMatchObject({ exitCode: 4, passed: false });
+	});
+
+	it("cancels in-flight proof execution when the user clears the goal", async () => {
+		const harness = await createGoalHarness();
+		const command = `${JSON.stringify(process.execPath)} -e "setTimeout(() => {}, 5000)"`;
+		Reflect.get(AgentSession.prototype, "_startGoal").call(harness.session, "cancel proof", undefined, [
+			{ command, timeoutSeconds: 5 },
+		]);
+		const completion = harness.session.handleGoalHostRequest("goal.complete");
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		Reflect.get(AgentSession.prototype, "_clearGoal").call(harness.session);
+
+		await expect(completion).rejects.toThrow("verification was cancelled");
+		expect(harness.session.goalState).toMatchObject({ status: "idle", active: false });
+	});
+
+	it("does not reuse a cancelled proof promise for a replacement goal", async () => {
+		const harness = await createGoalHarness();
+		initializeProofGitWorkspace(harness);
+		const slow = `${JSON.stringify(process.execPath)} -e "setTimeout(() => {}, 5000)"`;
+		const pass = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
+		Reflect.get(AgentSession.prototype, "_startGoal").call(harness.session, "old goal", undefined, [
+			{ command: slow, timeoutSeconds: 5 },
+		]);
+		const oldCompletion = harness.session.handleGoalHostRequest("goal.complete");
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		Reflect.get(AgentSession.prototype, "_startGoal").call(harness.session, "new goal", undefined, [
+			{ command: pass, timeoutSeconds: 5 },
+		]);
+		const newCompletion = harness.session.handleGoalHostRequest("goal.complete");
+
+		await expect(oldCompletion).rejects.toThrow("verification was cancelled");
+		await expect(newCompletion).resolves.toMatchObject({
+			goal: { objective: "new goal", status: "complete", completion_kind: "verified" },
+		});
 	});
 
 	it("rejects malformed and unknown goal host requests", async () => {
@@ -285,7 +414,7 @@ describe("AgentSession goals", () => {
 		const harness = await createGoalHarness();
 
 		const first = harness.session.handleGoalHostRequest("goal.create", { objective: "first goal" });
-		harness.session.handleGoalHostRequest("goal.complete");
+		await harness.session.handleGoalHostRequest("goal.complete");
 
 		const second = harness.session.handleGoalHostRequest("goal.create", { objective: "second goal" });
 		expect(second.goal).toMatchObject({ objective: "second goal", status: "active", tokens_used: 0 });
@@ -689,7 +818,7 @@ describe("AgentSession goals", () => {
 			active: false,
 			status: "complete",
 			tokenBudget: 10,
-			lastReason: "Goal achieved",
+			lastReason: "Goal achieved (self-reported)",
 		});
 		expect(harness.session.goalState.tokensUsed).toBeGreaterThanOrEqual(10);
 		expect(harness.getPendingResponseCount()).toBe(0);
@@ -1017,7 +1146,7 @@ describe("initial goal seeding from config", () => {
 		expect(harness.session.goalState.status).toBe("active");
 
 		// Complete the goal via host request
-		harness.session.handleGoalHostRequest("goal.complete");
+		await harness.session.handleGoalHostRequest("goal.complete");
 		expect(harness.session.goalState.status).toBe("complete");
 
 		// Simulate restart on the same session file
