@@ -56,9 +56,7 @@ export class SummitHeader implements Component {
 			frame(theme.bold("Ambition, orchestrated.")),
 			rule,
 			...details.map(frame),
-			...(!hideStartHint
-				? [rule, frame(`${startHint}  ·  /mission overview  ·  / commands  ·  @ files  ·  ! shell`)]
-				: []),
+			...(!hideStartHint ? [rule, frame(`${startHint}  ·  /mission  ·  / commands  ·  @ files  ·  ! shell`)] : []),
 			bottom,
 		];
 		return lines;

@@ -20,7 +20,7 @@ describe("SummitHeader", () => {
 		const output = stripAnsi(header.render(88).join("\n"));
 		expect(output).toContain("CAPRICORN / SUMMIT");
 		expect(output).toContain("Ambition, orchestrated.");
-		expect(output).toContain("/mission overview");
+		expect(output).toContain("/mission");
 		expect(output).not.toContain("▄");
 	});
 

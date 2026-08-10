@@ -41,7 +41,7 @@ export function formatCapricornTopBar(state: CapricornTopBarState, width: number
 
 export function formatExpeditionDockHeader(goal: GoalState | undefined): string {
 	if (!goal || goal.status === "idle") {
-		return `${theme.bold(theme.fg("accent", "GUIDE · READY"))}${theme.fg("dim", "  / commands · /mission overview")}`;
+		return `${theme.bold(theme.fg("accent", "GUIDE · READY"))}${theme.fg("dim", "  / commands · /mission")}`;
 	}
 	const objective = goal.objective?.replace(/\s+/g, " ").trim();
 	const tone = goal.status === "error" ? "error" : goal.status === "complete" ? "success" : "accent";

@@ -16,6 +16,10 @@ The default system prompt is Capricorn-owned: missions move through **Orient, Pl
 
 `/goal --check "<command>"` attaches user-approved executable acceptance checks. Capricorn reruns them before completion and records a bounded certificate with exit status, duration, output digests and preview, plus tamper-evident, stable before/after Git source-worktree identity. Failed checks keep the goal incomplete; goals without checks are visibly self-reported.
 
+## V1 release program
+
+The V1 **Adaptive Workspace** release combines Project Instincts, Taste Memory, Correction Learning, Verified Finish, Visual QA Memory, Safe Experiments, Continuity Briefings, Personal Playbooks, and a plain-language project control center. The binding capability and safety gates live in [V1_RELEASE.md](V1_RELEASE.md).
+
 ## Next
 
 ### Campaigns
