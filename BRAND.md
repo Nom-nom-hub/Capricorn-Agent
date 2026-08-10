@@ -45,4 +45,4 @@ Capricorn's terminal experience is structured as an expedition workspace rather 
 - **Crew** describes delegated workers as a group; technical surfaces may still say subagent.
 - **Trail Bar** is the persistent navigation and workspace dock.
 
-The shell uses a compact operational masthead, a mission-aware prompt deck, and a persistent command dock. Gold marks identity and primary focus; teal marks navigation and information; semantic states always include text rather than relying on color. Layouts must remain readable at 40, 80, and 120 columns, progressively removing secondary metadata before actions or status.
+The shell uses a compact operational masthead, a mission-aware prompt deck, a persistent command dock, and a searchable **Routes** map opened with `?`. Routes is a discovery layer over canonical commands—not a second command protocol. Gold marks identity and primary focus; teal marks navigation and information; semantic states always include text rather than relying on color. Layouts must remain readable at 40, 80, and 120 columns, progressively removing secondary metadata before actions or status.

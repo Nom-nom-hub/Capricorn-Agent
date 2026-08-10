@@ -73,7 +73,7 @@ export const KEYBINDINGS = {
 	"app.interrupt": { defaultKeys: [], description: "Interrupt current operation" },
 	"app.clear": { defaultKeys: "ctrl+c", description: "Interrupt current operation, then exit" },
 	"app.input.clear": { defaultKeys: "escape", description: "Interrupt response or clear prompt" },
-	"app.shortcuts": { defaultKeys: "?", description: "Show keyboard shortcuts" },
+	"app.shortcuts": { defaultKeys: "?", description: "Open Routes palette" },
 	"app.exit": { defaultKeys: "ctrl+d", description: "Exit when editor is empty" },
 	"app.suspend": {
 		defaultKeys: process.platform === "win32" ? [] : "ctrl+z",

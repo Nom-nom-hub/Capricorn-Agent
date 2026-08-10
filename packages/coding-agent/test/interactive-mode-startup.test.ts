@@ -81,7 +81,7 @@ describe("InteractiveMode startup hints", () => {
 		const mode = createMode();
 		const label = Reflect.get(InteractiveMode.prototype, "getTrayLocationLabel").call(mode);
 
-		expect(stripAnsi(label)).toBe("test-model • high  ? for shortcuts");
+		expect(stripAnsi(label)).toBe("test-model • high  ? for routes");
 	});
 
 	it("routes session-view requests through the existing agents-view return path", async () => {
@@ -164,7 +164,7 @@ describe("InteractiveMode startup hints", () => {
 		const mode = createMode(false, true, () => editorText);
 		const getLabel = () => Reflect.get(InteractiveMode.prototype, "getTrayLocationLabel").call(mode);
 
-		expect(stripAnsi(getLabel())).toBe("← agents/resume  test-model • high  ? for shortcuts");
+		expect(stripAnsi(getLabel())).toBe("← agents/resume  test-model • high  ? for routes");
 
 		editorText = "draft prompt";
 		expect(stripAnsi(getLabel())).toBe("← agents/resume  test-model • high");
@@ -175,7 +175,7 @@ describe("InteractiveMode startup hints", () => {
 		const mode = createMode(false, false, () => editorText);
 		const getLabel = () => Reflect.get(InteractiveMode.prototype, "getTrayLocationLabel").call(mode);
 
-		expect(stripAnsi(getLabel())).toBe("test-model • high  ? for shortcuts");
+		expect(stripAnsi(getLabel())).toBe("test-model • high  ? for routes");
 
 		editorText = "draft prompt";
 		expect(stripAnsi(getLabel())).toBe("test-model • high");
@@ -184,7 +184,7 @@ describe("InteractiveMode startup hints", () => {
 		expect(stripAnsi(getLabel())).toBe("test-model • high");
 
 		editorText = "";
-		expect(stripAnsi(getLabel())).toBe("test-model • high  ? for shortcuts");
+		expect(stripAnsi(getLabel())).toBe("test-model • high  ? for routes");
 	});
 
 	it("hides the tray shortcut guidance for chats with history", () => {

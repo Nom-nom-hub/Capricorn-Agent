@@ -205,6 +205,7 @@ import { InjectedPromptMessageComponent, isInjectedPromptMessage } from "./compo
 import { formatKeyText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.js";
 import { formatMissionStatus, readMissionWorkspaceStatus } from "./components/mission-status.js";
 import type { AuthSelectorProvider } from "./components/oauth-selector.js";
+import { categorizeRouteName, type RouteItem, RoutesPalette } from "./components/routes-palette.js";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.js";
 import { SettingsSelectorComponent } from "./components/settings-selector.js";
 import { SideQuestionComponent } from "./components/side-question.js";
@@ -1099,7 +1100,7 @@ export class InteractiveMode {
 			autocompleteMaxVisible,
 			isArgumentCommand: builtinSlashCommandTakesArgument,
 			promptPrefix: "› ",
-			placeholder: `${this.startHint}  ·  / commands  ·  ? shortcuts`,
+			placeholder: `${this.startHint}  ·  / commands  ·  ? routes`,
 			placeholderColor: (text) => theme.fg("dim", text),
 		});
 		this.defaultEditor.getHeaderLine = () => formatExpeditionDockHeader(this.connectionState?.goal);
@@ -4153,7 +4154,7 @@ export class InteractiveMode {
 		// Register app action handlers
 		this.defaultEditor.onAction("app.clear", () => this.handleCtrlC());
 		this.defaultEditor.onAction("app.interrupt", () => this.handleInterruptKey());
-		this.defaultEditor.onAction("app.shortcuts", () => this.showShortcutGuide());
+		this.defaultEditor.onAction("app.shortcuts", () => this.showRoutesPalette());
 		this.defaultEditor.onCtrlD = () => this.handleCtrlD();
 		this.defaultEditor.onAction("app.suspend", () => this.handleCtrlZ());
 
@@ -6013,7 +6014,7 @@ export class InteractiveMode {
 		if (!this.isNewChat() || this.editor.getText().length > 0) {
 			return undefined;
 		}
-		return keyText("app.shortcuts") ? keyHint("app.shortcuts", "for shortcuts") : "/hotkeys for shortcuts";
+		return keyText("app.shortcuts") ? keyHint("app.shortcuts", "for routes") : "/hotkeys for shortcuts";
 	}
 
 	private isNewChat(): boolean {
@@ -9495,6 +9496,77 @@ export class InteractiveMode {
 		return this.capitalizeKey(keyText(action));
 	}
 
+	private getRouteItems(): RouteItem[] {
+		const featuredPriority = new Map([
+			["mission", 1],
+			["goal", 2],
+			["new", 3],
+			["tree", 4],
+			["model", 5],
+			["settings", 6],
+			["heartbeats", 7],
+		]);
+		const routes: RouteItem[] = [
+			{
+				name: "keyboard-shortcuts",
+				command: "Keyboard shortcuts",
+				description: "Show the compact keyboard and prompt reference",
+				category: "Basecamp",
+				aliases: ["hotkeys", "help", "keys"],
+				featured: true,
+				priority: 8,
+				action: "shortcut-guide",
+			},
+			...BUILTIN_SLASH_COMMANDS.filter(
+				(command) => command.name !== "fast" || this.currentModelSupportsFastMode(),
+			).map((command) => ({
+				name: command.name,
+				command: `/${command.name}${command.takesArgument || command.argumentHint ? " " : ""}`,
+				description: command.description,
+				category: categorizeRouteName(command.name, "Basecamp"),
+				aliases: command.aliases,
+				featured: featuredPriority.has(command.name),
+				priority: featuredPriority.get(command.name),
+			})),
+		];
+		const knownNames = new Set(routes.map((route) => route.name));
+		for (const command of this.connectionCommands) {
+			if (knownNames.has(command.name)) continue;
+			if (command.source === "skill" && !this.settingsManager.getEnableSkillCommands()) continue;
+			knownNames.add(command.name);
+			const source = this.getAutocompleteSourceLabel(command.sourceInfo) ?? command.source;
+			routes.push({
+				name: command.name,
+				command: `/${command.name} `,
+				description: command.description ?? `Run the ${command.name} ${command.source} route`,
+				category: command.source === "prompt" ? "Prompts" : command.source === "skill" ? "Skills" : "Extensions",
+				source,
+			});
+		}
+		return routes;
+	}
+
+	private showRoutesPalette(): void {
+		this.clearShortcutGuide();
+		this.showSelector((done) => {
+			const palette = new RoutesPalette(this.getRouteItems(), {
+				getRows: () => this.ui.terminal.rows,
+				requestRender: () => this.ui.requestRender(),
+				onCancel: done,
+				onSelect: (route) => {
+					done();
+					if (route.action === "shortcut-guide") {
+						this.showShortcutGuide();
+						return;
+					}
+					this.editor.setText(route.command);
+					this.ui.requestRender();
+				},
+			});
+			return { component: palette, focus: palette };
+		});
+	}
+
 	private getShortcutGuide(): string {
 		const tab = this.getEditorKeyDisplay("tui.input.tab");
 		const newLine = this.getEditorKeyDisplay("tui.input.newLine");
@@ -9519,7 +9591,7 @@ export class InteractiveMode {
 \`${pasteImage}\` paste image
 
 **Help**
-${shortcutsKey ? `\`${shortcutsKey}\` quick shortcuts · ` : ""}\`/hotkeys\` full reference
+${shortcutsKey ? `\`${shortcutsKey}\` Routes palette · ` : ""}\`/hotkeys\` full reference
 `;
 	}
 
@@ -9597,7 +9669,7 @@ ${shortcutsKey ? `\`${shortcutsKey}\` quick shortcuts · ` : ""}\`/hotkeys\` ful
 | \`${tab}\` | Path completion / accept autocomplete |
 | \`${clearInput}\` | Clear input / cancel autocomplete |
 | \`${clear}\` | Interrupt current operation (first) / exit (second) |
-${interrupt ? `| \`${interrupt}\` | Interrupt current operation |\n` : ""}${shortcutsKey ? `| \`${shortcutsKey}\` | Show quick shortcuts |\n` : ""}| \`${exit}\` | Exit (when editor is empty) |
+${interrupt ? `| \`${interrupt}\` | Interrupt current operation |\n` : ""}${shortcutsKey ? `| \`${shortcutsKey}\` | Open Routes palette |\n` : ""}| \`${exit}\` | Exit (when editor is empty) |
 | \`${selectModel}\` | Open model selector |
 | \`${expandTools}\` | Toggle tool output expansion |
 | \`${toggleThinking}\` | Toggle thinking block visibility |

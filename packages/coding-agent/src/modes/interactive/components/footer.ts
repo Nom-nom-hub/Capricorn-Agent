@@ -30,8 +30,8 @@ export class FooterComponent implements Component {
 		const extensionStatuses = [...this.footerData.getExtensionStatuses().values()].filter(Boolean);
 		const left =
 			safeWidth < 48
-				? `${theme.bold(theme.fg("accent", "CAPRICORN"))}  /mission  ? shortcuts`
-				: `${theme.bold(theme.fg("accent", "CAPRICORN"))}  /mission  /model  /settings  ? shortcuts`;
+				? `${theme.bold(theme.fg("accent", "CAPRICORN"))}  /mission  ? routes`
+				: `${theme.bold(theme.fg("accent", "CAPRICORN"))}  /mission  /model  /settings  ? routes`;
 		const rightParts = [
 			branch ? `git:${branch}` : undefined,
 			providerCount > 0 ? `${providerCount} provider${providerCount === 1 ? "" : "s"}` : undefined,

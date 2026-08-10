@@ -53,7 +53,7 @@ type FakeInteractiveMode = {
 	};
 	keybindings?: KeybindingsManager;
 	handleDebugCommand?: Mock;
-	showShortcutGuide?: Mock;
+	showRoutesPalette?: Mock;
 };
 
 function createEditor(text = ""): FakeEditor {
@@ -113,7 +113,7 @@ function createInteractiveFake(options: {
 		showTreeSelector: vi.fn(),
 		shutdown: vi.fn().mockResolvedValue(undefined),
 		updateEditorBorderColor: vi.fn(),
-		showShortcutGuide: vi.fn(),
+		showRoutesPalette: vi.fn(),
 	};
 	Object.setPrototypeOf(fake, InteractiveMode.prototype);
 	return fake;
@@ -370,7 +370,7 @@ describe("InteractiveMode interrupt shortcuts", () => {
 		expect(mode.editor.getText()).toBe("draft");
 	});
 
-	it("opens keyboard shortcuts from the configured app action", () => {
+	it("opens the Routes palette from the compatible shortcuts action", () => {
 		const actionHandlers = new Map<string, () => void>();
 		const mode = createInteractiveFake({});
 		const defaultEditor: NonNullable<FakeInteractiveMode["defaultEditor"]> = {
@@ -387,6 +387,6 @@ describe("InteractiveMode interrupt shortcuts", () => {
 		Reflect.get(InteractiveMode.prototype, "setupKeyHandlers").call(mode);
 		actionHandlers.get("app.shortcuts")?.();
 
-		expect(mode.showShortcutGuide).toHaveBeenCalledTimes(1);
+		expect(mode.showRoutesPalette).toHaveBeenCalledTimes(1);
 	});
 });
