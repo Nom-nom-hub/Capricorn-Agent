@@ -102,6 +102,11 @@
 	],
 	"author": "Mario Zechner",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Nom-nom-hub/Capricorn-Agent.git",
+		"directory": "packages/coding-agent"
+	},
 	"engines": {
 		"node": ">=22.8.0"
 	}

@@ -26,6 +26,11 @@
 	],
 	"author": "Mario Zechner",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Nom-nom-hub/Capricorn-Agent.git",
+		"directory": "packages/tui"
+	},
 	"engines": {
 		"node": ">=20.0.0"
 	},

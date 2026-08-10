@@ -50,6 +50,10 @@
 		"node": ">=22.8.0"
 	},
 	"version": "0.7.1",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Nom-nom-hub/Capricorn-Agent.git"
+	},
 	"dependencies": {
 		"@earendil-works/pi-coding-agent": "^0.7.1",
 		"get-east-asian-width": "^1.6.0"

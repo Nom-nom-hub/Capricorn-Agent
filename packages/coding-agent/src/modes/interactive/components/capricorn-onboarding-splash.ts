@@ -126,8 +126,7 @@ export class CapricornOnboardingSplashComponent implements Component {
 	private formatBrandLine(): PanelTextLine {
 		return [
 			{ text: "Welcome to ", tone: "text" },
-			{ text: "PRIME", tone: "text", bold: true },
-			{ text: " Agent", tone: "text", italic: true },
+			{ text: "Capricorn", tone: "text", bold: true },
 		];
 	}
 

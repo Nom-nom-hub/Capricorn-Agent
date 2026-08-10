@@ -17,7 +17,7 @@ pkg update && pkg upgrade
 pkg install nodejs termux-api git ripgrep
 
 # Clone and install Capricorn from source
-git clone https://github.com/PrimeIntellect-ai/prime-agent.git
+git clone https://github.com/Nom-nom-hub/Capricorn-Agent.git
 cd capricorn
 npm ci
 

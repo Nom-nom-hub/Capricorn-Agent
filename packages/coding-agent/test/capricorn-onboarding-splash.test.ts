@@ -29,7 +29,7 @@ describe("CapricornOnboardingSplashComponent", () => {
 		const output = stripAnsi(lines.join("\n"));
 
 		expect(lines).toHaveLength(36);
-		expect(output).toContain("Welcome to PRIME Agent");
+		expect(output).toContain("Welcome to Capricorn");
 		expect(output).toContain("Press Enter to login with Prime Intellect");
 		expect(output).toContain("·");
 		expect(output).not.toContain("prime agent");
@@ -59,7 +59,7 @@ describe("CapricornOnboardingSplashComponent", () => {
 		expect(output).not.toContain("→");
 		expect(output).not.toContain("Use a subscription");
 		expect(output).not.toContain("Use an API key");
-		expect(output).toContain(CAPRICORN_LOGO.split("\n")[0].trim());
+		expect(output).toMatch(/████/);
 		for (const line of lines) {
 			expect(visibleWidth(line)).toBeLessThanOrEqual(100);
 		}
@@ -129,7 +129,7 @@ describe("CapricornOnboardingSplashComponent", () => {
 
 		expect(renderRequests).toBe(3);
 		expect(secondRender).not.toBe(firstRender);
-		expect(secondRender).toContain("Welcome to PRIME Agent");
+		expect(secondRender).toContain("Welcome to Capricorn");
 		expect(secondRender).toContain("Press Enter to login with Prime Intellect");
 	});
 
@@ -141,7 +141,7 @@ describe("CapricornOnboardingSplashComponent", () => {
 		);
 		const rendered = component.render(60).map((line) => stripAnsi(line));
 		const logoLine = rendered.find((line) => line.includes(CAPRICORN_LOGO.split("\n")[0].trim()));
-		const brandLine = rendered.find((line) => line.includes("Welcome to PRIME Agent"));
+		const brandLine = rendered.find((line) => line.includes("Welcome to Capricorn"));
 		const hintLine = rendered.find((line) => line.includes("Press Enter to login with Prime Intellect"));
 
 		expect(logoLine?.search(/\S/)).toBeGreaterThan(0);

@@ -7,7 +7,7 @@ See the repository [AGENTS.md](../../../AGENTS.md) for the current contribution 
 Capricorn requires Node.js 22.8.0 or newer.
 
 ```bash
-git clone <your-capricorn-repository-url> capricorn-agent
+git clone https://github.com/Nom-nom-hub/Capricorn-Agent capricorn-agent
 cd capricorn-agent
 npm ci
 ```
