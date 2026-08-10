@@ -4,6 +4,10 @@ Capricorn is focused on verifiable, long-running agent work. These features are 
 
 ## Shipped
 
+### Capricorn Mission Doctrine
+
+The default system prompt is Capricorn-owned: missions move through **Orient, Plan, Execute, Verify, Report**, with explicit rules for evidence, uncertainty, recovery, user-work preservation, and evaluation of delegated results. Runtime API names remain stable compatibility contracts rather than product identity.
+
 ### Mission Control
 
 `/mission` provides a live, model-free view of the active goal, Git workspace, model/run state, context usage, direct subagents, queued input, and the next deterministic action. It does not spend tokens or ask a model to invent status.

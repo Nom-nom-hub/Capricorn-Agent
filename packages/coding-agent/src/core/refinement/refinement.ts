@@ -433,6 +433,8 @@ export function formatHarnessStateForPrompt(
 		maxRefinements?: number;
 		maxContentLength?: number;
 		includeIpythonExamples?: boolean;
+		includeRecursionExamples?: boolean;
+		includeAgentMessageExamples?: boolean;
 		includeShellExamples?: boolean;
 		includeRefineExamples?: boolean;
 	} = {},
@@ -441,7 +443,20 @@ export function formatHarnessStateForPrompt(
 	const maxRefinements = options.maxRefinements ?? DEFAULT_OVERVIEW_REFINEMENT_LIMIT;
 	const maxContentLength = options.maxContentLength ?? DEFAULT_OVERVIEW_CONTENT_LIMIT;
 	const includeIpythonExamples = options.includeIpythonExamples ?? true;
+	const includeRecursionExamples = options.includeRecursionExamples ?? includeIpythonExamples;
+	const includeAgentMessageExamples = options.includeAgentMessageExamples ?? includeRecursionExamples;
 	const includeRefineExamples = options.includeRefineExamples ?? includeIpythonExamples;
+	const ipythonSkillContract =
+		"Call contract: read each installed Python skill's SKILL.md and call its documented module function in IPython; do not assume a `.run` entrypoint. Use `<skill_import> ...` in shell when a CLI exists. Continual harness skill entries are Python REPL skills with an explicit Python `reference` and `arguments` contract.";
+	const callContract = includeIpythonExamples
+		? includeRecursionExamples
+			? includeAgentMessageExamples
+				? `${ipythonSkillContract} Spawn a continual harness subagent spec by composing a concise task prompt and calling \`handle = await rlm('sub-task')\`; admission returns immediately with \`rlm_child_id\`, \`name\`, \`session_dir\`, and \`model\`, never the child's answer. Results arrive only through explicit \`agent_message\` replies or files; children reply with \`await agent_message.send(message, receiver_role='parent')\`. Use \`await rlm.list_subagents()\` to recover direct child handles and \`await agent_message.send(..., receiver_role='child', receiver_name=handle.name)\` for follow-ups. Do not invent wrappers such as \`call_skill(...)\`, \`run_subagent(...)\`, or named subagent registries.`
+				: `${ipythonSkillContract} Spawn a continual harness subagent spec by composing a concise task prompt and calling \`handle = await rlm('sub-task')\`; admission returns immediately with \`rlm_child_id\`, \`name\`, \`session_dir\`, and \`model\`, never the child's answer. Results arrive through available observation capabilities or files, never as the \`rlm\` return value. Use \`await rlm.list_subagents()\` to recover direct child handles. Do not invent wrappers such as \`call_skill(...)\`, \`run_subagent(...)\`, or named subagent registries.`
+			: `${ipythonSkillContract} Recursive subagents are unavailable in this session; do not call \`rlm\` or invented delegation wrappers.`
+		: options.includeShellExamples
+			? "Call contract: use installed skills as shell commands when available (for example `<skill_import> ...`). Continual harness entries are routing/context hints only in sessions without IPython; do not use Python `await`, `asyncio`, or `rlm` examples unless the prompt also documents an IPython kernel."
+			: "Call contract: continual harness entries are routing/context hints only in sessions without IPython or shell access; do not use Python `await`, `asyncio`, `rlm`, or shell skill commands unless the prompt also documents those interfaces.";
 	const lines = [
 		"# Continual Harness State",
 		"",
@@ -454,11 +469,7 @@ export function formatHarnessStateForPrompt(
 			? "When to call `await refine.run()`: after a repeated failure, a reusable tactic emerges, a repeated delegation role should become a subagent spec, a repeated procedure should become a skill, a durable fact/preference should become a memory, a narrow behavioral policy should become a prompt addendum, a user corrects behavior that should persist locally or globally, validation shows a continual harness entry is wrong, or a skill/subagent/memory/prompt note should be created, updated, deleted, or rolled back. Keep `await refine.run()` continual harness edits small and evidence-backed."
 			: "When to refine the continual harness: after a repeated failure, a reusable tactic emerges, a repeated delegation role should become a subagent spec, a repeated procedure should become a skill, a durable fact/preference should become a memory, a narrow behavioral policy should become a prompt addendum, a user corrects behavior that should persist locally or globally, validation shows a continual harness entry is wrong, or a skill/subagent/memory/prompt note should be created, updated, deleted, or rolled back. Keep continual harness edits small and evidence-backed.",
 		"",
-		includeIpythonExamples
-			? "Call contract: read each installed Python skill's SKILL.md and call its documented module function in IPython; do not assume a `.run` entrypoint. Use `<skill_import> ...` in shell when a CLI exists. Continual harness skill entries are Python REPL skills with an explicit Python `reference` and `arguments` contract. Spawn a continual harness subagent spec by composing a concise task prompt and calling `handle = await rlm('sub-task')`; admission returns immediately with `rlm_child_id`, `name`, `session_dir`, and `model`, never the child's answer. Results arrive only through explicit `agent_message` replies or files; children reply with `await agent_message.send(message, receiver_role='parent')`. Use `await rlm.list_subagents()` to recover direct child handles and `await agent_message.send(..., receiver_role='child', receiver_name=handle.name)` for follow-ups. Do not invent wrappers such as `call_skill(...)`, `run_subagent(...)`, or named subagent registries."
-			: options.includeShellExamples
-				? "Call contract: use installed skills as shell commands when available (for example `<skill_import> ...`). Continual harness entries are routing/context hints only in sessions without IPython; do not use Python `await`, `asyncio`, or `rlm` examples unless the prompt also documents an IPython kernel."
-				: "Call contract: continual harness entries are routing/context hints only in sessions without IPython or shell access; do not use Python `await`, `asyncio`, `rlm`, or shell skill commands unless the prompt also documents those interfaces.",
+		callContract,
 		"",
 	];
 
@@ -468,10 +479,10 @@ export function formatHarnessStateForPrompt(
 			[a.path, a.title, a.id].join("\0").localeCompare([b.path, b.title, b.id].join("\0")),
 		);
 		totalEntries += entries.length;
-		// Render subagent specs as a task-shaped roster the model can match against — the
-		// analogue of Claude Code's agent-type menu — rather than a bare count. In
-		// IPython sessions, include the native `rlm` invocation hint.
-		if (kind === "subagent" && entries.length > 0 && includeIpythonExamples) {
+		// Render subagent specs as a task-shaped roster the model can match against
+		// rather than a bare count. When recursive IPython capabilities are active,
+		// include the native `rlm` invocation hint.
+		if (kind === "subagent" && entries.length > 0 && includeIpythonExamples && includeRecursionExamples) {
 			lines.push(
 				`${kind}: ${entries.length} (invoke a spec by turning it into a concise task prompt and spawning with \`await rlm('<task>')\`; admission returns a child handle, never the answer)`,
 			);

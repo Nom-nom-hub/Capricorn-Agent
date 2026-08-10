@@ -40,6 +40,12 @@ capricorn doctor --fix
 capricorn shutdown
 ```
 
+## Capricorn-native operating doctrine
+
+Capricorn's default system prompt is built around a five-stage expedition loop: **Orient, Plan, Execute, Verify, Report**. It treats requests as missions, separates observed evidence from inference, evaluates delegated work before accepting it, and forbids confident completion claims that exceed the available proof.
+
+The doctrine is assembled with live workspace, tool, skill, crew, project, goal, and continual-harness context rather than being a static persona. Operational RLM and IPython contracts remain intact for compatibility, while the product identity and decision hierarchy are Capricorn-owned. Inspect the exact prompt for the current session with `/system-prompt`; a configured custom system prompt still replaces the default doctrine.
+
 ## Proof-Carrying Goals
 
 Capricorn goals can carry user-approved executable acceptance checks. The host reruns the persisted checks whenever the agent requests completion; every check must pass against a stable worktree before the goal becomes **verified**.

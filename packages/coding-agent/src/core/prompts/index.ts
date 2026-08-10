@@ -1,7 +1,9 @@
 export {
+	buildCapricornPrompt,
 	buildChildAgentDoctrine,
 	buildRlmPrompt,
 	buildSubagentGuidance,
+	type CapricornPromptOptions,
 	type ChildAgentDoctrineOptions,
 	type RlmPromptOptions,
-} from "./rlm.js";
+} from "./capricorn.js";

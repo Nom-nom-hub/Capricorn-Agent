@@ -2,7 +2,7 @@
  * System prompt construction and project context loading
  */
 
-import { buildChildAgentDoctrine, buildRlmPrompt, buildSubagentGuidance } from "./prompts/index.js";
+import { buildCapricornPrompt, buildChildAgentDoctrine, buildSubagentGuidance } from "./prompts/index.js";
 import { formatHarnessStateForPrompt, type HarnessState, REFINE_SKILL_NAME } from "./refinement/index.js";
 import { formatSkillsForPrompt, getPythonSkillRuntimeInfo, type Skill } from "./skills.js";
 
@@ -67,6 +67,8 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 	const hasBash = tools.includes("bash");
 	const visibleSkills = skills.filter((skill) => !skill.disableModelInvocation);
 	const visiblePythonSkillImportNames = getPythonSkillRuntimeInfo(visibleSkills).map((skill) => skill.importName);
+	const visiblePythonSkillNames = new Set(visiblePythonSkillImportNames);
+	const hasAgentMessage = visiblePythonSkillNames.has("agent_message");
 	const hasRefineSkill = visibleSkills.some((skill) => skill.name === REFINE_SKILL_NAME);
 
 	if (customPrompt) {
@@ -103,7 +105,13 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		}
 
 		if (harnessState) {
-			prompt += `\n\n${formatHarnessStateForPrompt(harnessState, { includeIpythonExamples: hasIpython, includeShellExamples: hasBash, includeRefineExamples: hasIpython && hasRefineSkill })}`;
+			prompt += `\n\n${formatHarnessStateForPrompt(harnessState, {
+				includeIpythonExamples: hasIpython,
+				includeRecursionExamples: (allowRecursion ?? true) && hasIpython,
+				includeAgentMessageExamples: hasAgentMessage,
+				includeShellExamples: hasBash,
+				includeRefineExamples: hasIpython && hasRefineSkill,
+			})}`;
 		}
 
 		if (appendSection) {
@@ -113,7 +121,7 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		return prompt;
 	}
 
-	let prompt = buildRlmPrompt({
+	let prompt = buildCapricornPrompt({
 		cwd: promptCwd,
 		messagesPath: promptMessagesPath,
 		installedSkills: visiblePythonSkillImportNames,
@@ -123,13 +131,9 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		parentAgent: options.rlmParentAgent,
 	});
 
-	// Appended AFTER the trained buildRlmPrompt prefix, and before the harness-state
-	// menu, so the model reads when/why to delegate and then sees the concrete subagent
-	// specs it can match against — the same ordering as Claude Code's Agent tool.
+	// Appended after the Capricorn mission doctrine and before the harness-state
+	// menu, so the model sees crew guidance before concrete reusable subagent specs.
 	if ((allowRecursion ?? true) && hasIpython) {
-		const visiblePythonSkillNames = new Set(
-			getPythonSkillRuntimeInfo(visibleSkills).map((skill) => skill.importName),
-		);
 		prompt += `\n\n${buildSubagentGuidance({
 			includeRefineExamples: hasRefineSkill,
 			hasAgentMessage: visiblePythonSkillNames.has("agent_message"),
@@ -138,7 +142,13 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 	}
 
 	if (harnessState) {
-		prompt += `\n\n${formatHarnessStateForPrompt(harnessState, { includeIpythonExamples: hasIpython, includeShellExamples: hasBash, includeRefineExamples: hasIpython && hasRefineSkill })}`;
+		prompt += `\n\n${formatHarnessStateForPrompt(harnessState, {
+			includeIpythonExamples: hasIpython,
+			includeRecursionExamples: (allowRecursion ?? true) && hasIpython,
+			includeAgentMessageExamples: hasAgentMessage,
+			includeShellExamples: hasBash,
+			includeRefineExamples: hasIpython && hasRefineSkill,
+		})}`;
 	}
 
 	const guidelines = formatPromptGuidelines(promptGuidelines);

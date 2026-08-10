@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Replaced the inherited generic agent prompt with Capricorn's native mission doctrine: Orient, Plan, Execute, Verify, Report, with explicit evidence, completion, recovery, and crew principles while preserving runtime compatibility.
 - Added Proof-Carrying Goals with user-declared acceptance checks, completion gating, bounded proof certificates, stable worktree binding, and explicit verified/self-reported UI states.
 - Added the searchable Summit Routes palette on `?`, covering built-in, prompt, skill, and extension commands without changing existing keybinding identifiers.
 - Changed the terminal shell to Summit UI with an Expedition top bar, compact operational masthead, mission-aware prompt deck, branded prompt marker, and persistent Trail Bar.
