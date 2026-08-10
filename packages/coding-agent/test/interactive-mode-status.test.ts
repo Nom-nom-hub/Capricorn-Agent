@@ -5026,3 +5026,46 @@ describe("InteractiveMode.showLoadedResources", () => {
 		expect(output).not.toContain("[Skill conflicts]");
 	});
 });
+
+describe("InteractiveMode Mission Control", () => {
+	beforeAll(() => initTheme("capricorn"));
+
+	test("renders live connection state without sending a model prompt", async () => {
+		const chatContainer = new Container();
+		const connectionState = createConnectionState({
+			cwd: "/path/that/is/not/a/git/repository",
+			goal: {
+				active: true,
+				status: "active",
+				objective: "Ship Mission Control",
+				tokensUsed: 500,
+				timeUsedSeconds: 10,
+				continuationsUsed: 0,
+			},
+			contextUsage: { tokens: 10_000, contextWindow: 100_000, percent: 10 },
+		});
+		const requestRender = vi.fn();
+		const getState = vi.fn(async () => connectionState);
+		const getQueue = vi.fn(async () => ({ steering: [], followUp: [] }));
+		const prompt = vi.fn();
+		const fakeThis = {
+			agentConnection: { getState, getQueue, prompt },
+			chatContainer,
+			subagentSnapshots: new Map(),
+			rlmNodeId: undefined,
+			ui: { terminal: { columns: 100 }, requestRender },
+			showError: vi.fn(),
+		} as unknown as InteractiveMode;
+
+		await Reflect.get(InteractiveMode.prototype, "handleMissionCommand").call(fakeThis);
+
+		const output = normalizeRenderedOutput(chatContainer);
+		expect(output).toContain("CAPRICORN MISSION CONTROL");
+		expect(output).toContain("Ship Mission Control");
+		expect(output).toContain("Not a Git workspace");
+		expect(getState).toHaveBeenCalledOnce();
+		expect(getQueue).toHaveBeenCalledOnce();
+		expect(prompt).not.toHaveBeenCalled();
+		expect(requestRender).toHaveBeenCalledOnce();
+	});
+});

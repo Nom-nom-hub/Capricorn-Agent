@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added `/mission`, a Capricorn Mission Control panel for goal, workspace, run, subagent, and deterministic next-action status.
+- Changed the startup splash to use Capricorn gold with the product name and tagline.
 - Changed the public product identity to Capricorn, including the CLI, isolated state directory, gold theme and mark, source documentation, opt-in release channel, and telemetry-off default.
 - Added a configurable copy action to login dialogs so raw sign-in URLs can be copied without selecting wrapped text ([#643](https://github.com/PrimeIntellect-ai/prime-agent/issues/643)).
 - Added privacy-safe pseudonymous product analytics for onboarding, command use, execution modes, run outcomes, TTFT, latency, usage, tools, retries, and compactions, with disclosure and opt-out controls ([ENG-4682](https://linear.app/primeintellect/issue/ENG-4682/add-privacy-safe-posthog-analytics-to-prime-agent)).

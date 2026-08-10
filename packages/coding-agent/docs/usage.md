@@ -46,6 +46,7 @@ Type `/` in the editor to open command completion. Extensions can register custo
 | `/new` | Start a new session |
 | `/name <name>` | Set session display name |
 | `/session` | Show session file, ID, and message counts |
+| `/mission` | Open Capricorn Mission Control for goal, workspace, run, subagent, and next-action status |
 | `/traces [status\|on\|off\|preview\|upload-current\|upload-all\|login]` | Preview, upload, or manage opt-in trace sharing |
 | `/usage`, `/context` | Show the parent and subagent context, token, and cost breakdown |
 | `/tree` | Jump to any point in the session and continue from there |

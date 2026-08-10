@@ -14,6 +14,14 @@ import {
 } from "../src/core/slash-commands.js";
 
 describe("built-in slash commands", () => {
+	test("exposes Capricorn Mission Control as a client-owned command", () => {
+		expect(BUILTIN_SLASH_COMMANDS.find((command) => command.name === "mission")).toMatchObject({
+			description: "Open Capricorn Mission Control",
+		});
+		expect(builtinSlashCommandTakesArgument("mission")).toBe(false);
+		expect(isSessionSlashCommandName("mission")).toBe(false);
+	});
+
 	test("exposes heartbeat without exposing a cron slash command", () => {
 		const commandNames = BUILTIN_SLASH_COMMANDS.map((command) => command.name);
 

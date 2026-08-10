@@ -49,6 +49,8 @@ describe("InteractiveMode startup hints", () => {
 		const output = stripAnsi(lines.join("\n"));
 
 		expect(lines[0]).toBe("");
+		expect(output).toContain("CAPRICORN");
+		expect(output).toContain("Ambition, orchestrated.");
 		expect(output).toContain("version  v0.0.0");
 		expect(output).toContain("model    test-model");
 		expect(output).toContain("cwd      /tmp/project");

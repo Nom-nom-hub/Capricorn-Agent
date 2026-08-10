@@ -202,6 +202,7 @@ import { FooterComponent } from "./components/footer.js";
 import { HeartbeatManagerComponent } from "./components/heartbeat-manager.js";
 import { InjectedPromptMessageComponent, isInjectedPromptMessage } from "./components/injected-prompt-message.js";
 import { formatKeyText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.js";
+import { formatMissionStatus, readMissionWorkspaceStatus } from "./components/mission-status.js";
 import type { AuthSelectorProvider } from "./components/oauth-selector.js";
 import { ScopedModelsSelectorComponent } from "./components/scoped-models-selector.js";
 import { SettingsSelectorComponent } from "./components/settings-selector.js";
@@ -441,6 +442,9 @@ export class BrandSplashHeader implements Component {
 		const startHint = this.options.getStartHint?.() ?? "type to start";
 		const metaLines = showMeta
 			? [
+					theme.bold(theme.fg("accent", APP_TITLE.toUpperCase())),
+					theme.fg("dim", "Ambition, orchestrated."),
+					"",
 					labelled("version", `v${this.version}`),
 					labelled("model", this.getModelId() ?? "—"),
 					labelled("cwd", formatSplashCwd(this.getCwd())),
@@ -452,7 +456,7 @@ export class BrandSplashHeader implements Component {
 		const lines = this.options.topPadding ? [""] : [];
 		lines.push(
 			...this.logoRaw.map((line, index) => {
-				const colored = theme.fg("text", line);
+				const colored = theme.fg("accent", line);
 				const meta = index >= metaStart && index < metaStart + metaLines.length ? metaLines[index - metaStart] : "";
 				const padding = showMeta
 					? " ".repeat(Math.max(0, this.logoCanvasWidth - visibleWidth(line) + this.gutter))
@@ -4697,6 +4701,16 @@ export class InteractiveMode {
 					this.editor.setText("");
 					return;
 				}
+				if (commandName === "mission") {
+					this.editor.setText("");
+					if (commandArgs) {
+						this.showError("Usage: /mission");
+						return;
+					}
+					this.echoLocalCommand(text);
+					await this.handleMissionCommand();
+					return;
+				}
 				if (commandName === "system-prompt" && !commandArgs) {
 					this.echoLocalCommand(text);
 					await this.handleSystemPromptCommand();
@@ -8875,6 +8889,30 @@ export class InteractiveMode {
 					`RLM max depth set for this chat, but the global default was not saved: ${result.globalError}`,
 				);
 			}
+		} catch (error) {
+			this.showError(error instanceof Error ? error.message : String(error));
+		}
+	}
+
+	private async handleMissionCommand(): Promise<void> {
+		try {
+			const state = await this.agentConnection.getState();
+			const queue = await this.agentConnection.getQueue().catch(() => ({ steering: [], followUp: [] }));
+			const workspace = readMissionWorkspaceStatus(state.cwd);
+			const width = Math.max(40, Math.min(this.ui.terminal.columns - 4, 100));
+			const info = formatMissionStatus(
+				{
+					state,
+					children: [...this.subagentSnapshots.values()],
+					queue,
+					workspace,
+					parentId: this.rlmNodeId,
+				},
+				width,
+			);
+			this.chatContainer.addChild(new Spacer(1));
+			this.chatContainer.addChild(new Text(info, 1, 0));
+			this.ui.requestRender();
 		} catch (error) {
 			this.showError(error instanceof Error ? error.message : String(error));
 		}

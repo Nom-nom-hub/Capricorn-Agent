@@ -145,6 +145,7 @@ Type `/` in the editor to trigger commands. [Extensions](#extensions) can regist
 | `/new`, `/clear` | Start a new session |
 | `/name <name>` | Set session display name |
 | `/session` | Show session info (file, ID, messages) |
+| `/mission` | Open Capricorn Mission Control for goal, workspace, run, subagent, and next-action status |
 | `/traces [status\|on\|off\|preview\|upload-current\|upload-all\|login]` | Preview traces, run one-shot current/all uploads, and manage automatic sharing (`upload` aliases `upload-current`) |
 | `/usage` | Show token, cost, and context usage |
 | `/tree` | Jump to any point in the session and continue from there |

@@ -15,7 +15,7 @@ Capricorn is a self-improving coding and research agent built for serious, long-
 - **State:** `~/.capricorn/agent`
 - **Tagline:** *Ambition, orchestrated.*
 
-See [BRAND.md](BRAND.md) for the visual system.
+See [BRAND.md](BRAND.md) for the visual system. See [ROADMAP.md](ROADMAP.md) for Capricorn-native product features.
 
 ## Run from source
 

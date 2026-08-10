@@ -1,0 +1,39 @@
+# Capricorn Product Roadmap
+
+Capricorn is focused on verifiable, long-running agent work. These features are Capricorn product directions, not upstream rename work.
+
+## Shipped
+
+### Mission Control
+
+`/mission` provides a live, model-free view of the active goal, Git workspace, model/run state, context usage, direct subagents, queued input, and the next deterministic action. It does not spend tokens or ask a model to invent status.
+
+## Next
+
+### Proof-Carrying Goals
+
+Goals can declare executable acceptance checks. Capricorn reruns them before completion and records a bounded, auditable certificate containing exit status, time, output digest, and worktree identity. Unverified goals remain clearly labeled as self-reported.
+
+### Campaigns
+
+A workspace-level objective graph spanning sessions and agents, with milestones, dependencies, owners, budgets, blockers, and completion evidence.
+
+### Research Dossiers
+
+Claims linked to source snapshots, file and commit hashes, commands, and agent provenance, with stale-source detection and Markdown/HTML/JSON export.
+
+### Evaluated Delegation
+
+Run isolated subagents or models against the same task, apply explicit tests or rubrics, and retain the evidence used to select a result.
+
+### Harness Lab
+
+Treat self-improvement changes as candidates. Evaluate them against local canaries before promotion, and quarantine or roll them back when quality or cost regresses.
+
+## Product principles
+
+- Verify outcomes instead of trusting completion claims.
+- Show current state without spending a model turn.
+- Keep evidence durable, bounded, and inspectable.
+- Preserve provider choice and local-first operation.
+- Make every autonomous action attributable to a session, agent, and objective.
